@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(
     poker_core
     src/card.cpp
+    src/deck.cpp
     src/simulator.cpp
 )
 

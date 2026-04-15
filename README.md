@@ -28,6 +28,7 @@ cmake --build build
 - One library target: `poker_core`
 - One executable target: `poker_cli`
 - A `Card` model with `Suit`, `Rank`, and `Card`
+- A `Deck` model with reset and draw behavior
 - One tiny simulator class with a placeholder method
 
 ## Milestone 1: Project Basics
@@ -73,9 +74,30 @@ This milestone is useful because it teaches:
 - header declarations vs source-file definitions
 - passing small value types around without dynamic allocation
 
+## Milestone 3: Deck Model
+
+This milestone adds a `Deck` class that owns exactly 52 cards.
+
+- `Deck`
+  Stores cards in a `std::array<Card, 52>`.
+- `reset()`
+  Rebuilds the deck in a known order.
+- `draw(Card& out_card)`
+  Copies the next card into a variable supplied by the caller.
+- `remaining()`
+  Reports how many cards are left.
+
+This milestone is useful because it teaches:
+
+- `std::array`
+- constructors
+- class member variables
+- tracking object state with an index
+- passing output values by reference
+- keeping ownership simple and local
+
 ## Next Steps
 
-1. Add a `Deck` type.
-2. Parse a couple of hole cards from the command line.
-3. Add a first simulation loop, even if it is naive.
-4. Measure it, then improve memory layout and performance on purpose.
+1. Parse a couple of hole cards from the command line.
+2. Add a first simulation loop, even if it is naive.
+3. Measure it, then improve memory layout and performance on purpose.

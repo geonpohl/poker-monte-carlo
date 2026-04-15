@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 namespace poker {
 
 // enum class creates a strongly-typed enum.
@@ -32,6 +34,34 @@ enum class Rank {
 struct Card {
     Rank rank;
     Suit suit;
+};
+
+// These arrays give us one place that lists every possible suit and rank.
+// They are useful when we want to build a full deck in a simple loop.
+// inline means it is okay for this definition to appear in a header included
+// by multiple .cpp files.
+// constexpr means the value can be known at compile time, and are constant.
+inline constexpr std::array<Suit, 4> all_suits{
+    Suit::clubs,
+    Suit::diamonds,
+    Suit::hearts,
+    Suit::spades,
+};
+
+inline constexpr std::array<Rank, 13> all_ranks{
+    Rank::two,
+    Rank::three,
+    Rank::four,
+    Rank::five,
+    Rank::six,
+    Rank::seven,
+    Rank::eight,
+    Rank::nine,
+    Rank::ten,
+    Rank::jack,
+    Rank::queen,
+    Rank::king,
+    Rank::ace,
 };
 
 // These helper functions let the CLI turn enum values into printable text.
