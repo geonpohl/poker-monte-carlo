@@ -10,7 +10,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Build our reusable code as a library target.
 # Right now the library is tiny, but later it will hold most of the poker logic.
-add_library(poker_core src/simulator.cpp)
+add_library(
+    poker_core
+    src/card.cpp
+    src/simulator.cpp
+)
 
 # Any target that links to poker_core can include headers from include/.
 target_include_directories(poker_core PUBLIC include)
