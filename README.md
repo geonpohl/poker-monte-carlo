@@ -29,7 +29,30 @@ cmake --build build
 - One executable target: `poker_cli`
 - One tiny simulator class with a placeholder method
 
-## Suggested next steps
+## Milestone 1: Project Basics
+
+The goal of this milestone is not poker logic yet. The goal is to understand how a simple C++ project is split up.
+
+- `CMakeLists.txt`
+  Describes how the project is built.
+- `include/poker/simulator.hpp`
+  Declares the `MonteCarloSimulator` class.
+- `src/simulator.cpp`
+  Defines the class function bodies.
+- `apps/equity_cli.cpp`
+  Contains `main()`, which is the program entry point.
+
+The current flow is:
+
+1. CMake builds `poker_core` from `src/simulator.cpp`.
+2. CMake builds `poker_cli` from `apps/equity_cli.cpp`.
+3. `poker_cli` links against `poker_core`.
+4. `main()` creates a `MonteCarloSimulator` and calls `status()`.
+
+This is a good starter shape because it teaches one important C++ habit early:
+put reusable logic in library code, and keep `main()` small.
+
+## Next Steps
 
 1. Add a `Card` type.
 2. Add a `Deck` type.
