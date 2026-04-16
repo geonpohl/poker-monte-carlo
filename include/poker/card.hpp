@@ -70,4 +70,10 @@ inline constexpr std::array<Rank, 13> all_ranks{
 [[nodiscard]] char suit_symbol(Suit suit) noexcept;
 [[nodiscard]] char rank_symbol(Rank rank) noexcept;
 
+// Parsing helpers let us turn command-line text such as "As" into Card values.
+// They return true on success and false if the text is invalid.
+bool parse_suit(const char* text, Suit& out_suit) noexcept;
+bool parse_rank(const char* text, Rank& out_rank) noexcept;
+bool parse_card(const char* text, Card& out_card) noexcept;
+
 }  // namespace poker

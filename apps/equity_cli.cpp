@@ -7,6 +7,13 @@
 
 namespace {
 
+void print_usage(const char* program_name)
+{
+    std::cout << "Usage: " << program_name << " <card1> <card2>\n";
+    std::cout << "Example: " << program_name << " As Kh\n";
+    std::cout << "Cards use rank+suit, such as As, Td, 10h, or 2c.\n";
+}
+
 void print_card(const poker::Card& card)
 {
     std::cout << poker::rank_name(card.rank) << " of " << poker::suit_name(card.suit) << " ("
@@ -15,12 +22,32 @@ void print_card(const poker::Card& card)
 
 }  // namespace
 
-int main()
+int main(int argc, char* argv[])
 {
-    // Create a couple of example cards using aggregate initialization:
-    // Card{rank, suit}
-    const poker::Card ace_of_spades{poker::Rank::ace, poker::Suit::spades};
-    const poker::Card ten_of_hearts{poker::Rank::ten, poker::Suit::hearts};
+    if (argc != 3) {
+        print_usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    poker::Card first_card{poker::Rank::two, poker::Suit::clubs};
+    poker::Card second_card{poker::Rank::two, poker::Suit::clubs};
+
+    if (!poker::parse_card(argv[1], first_card)) {
+        std::cerr << "Could not parse first card: " << argv[1] << '\n';
+        print_usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    if (!poker::parse_card(argv[2], second_card)) {
+        std::cerr << "Could not parse second card: " << argv[2] << '\n';
+        print_usage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    if (first_card.rank == second_card.rank && first_card.suit == second_card.suit) {
+        std::cerr << "Duplicate cards are not allowed.\n";
+        return EXIT_FAILURE;
+    }
 
     // Create a full 52-card deck.
     poker::Deck deck{};
@@ -31,12 +58,12 @@ int main()
     // This executable is intentionally small.
     // Its job is to call into the library and print results for the user.
     std::cout << "poker-monte-carlo scaffold\n";
-    std::cout << "Example cards:\n";
+    std::cout << "Parsed cards:\n";
     std::cout << "  ";
-    print_card(ace_of_spades);
+    print_card(first_card);
     std::cout << '\n';
     std::cout << "  ";
-    print_card(ten_of_hearts);
+    print_card(second_card);
     std::cout << '\n';
 
     std::cout << "Deck example:\n";

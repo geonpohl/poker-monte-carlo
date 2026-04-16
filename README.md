@@ -19,7 +19,13 @@ This version is intentionally light on scaffolding so the interesting parts of t
 ```bash
 cmake -S . -B build
 cmake --build build
-./build/poker_cli
+./build/poker_cli As Kh
+```
+
+Or with the convenience `Makefile`:
+
+```bash
+make run ARGS="As Kh"
 ```
 
 ## What exists right now
@@ -29,6 +35,7 @@ cmake --build build
 - One executable target: `poker_cli`
 - A `Card` model with `Suit`, `Rank`, and `Card`
 - A `Deck` model with reset and draw behavior
+- CLI parsing for two hole cards
 - One tiny simulator class with a placeholder method
 
 ## Milestone 1: Project Basics
@@ -96,8 +103,28 @@ This milestone is useful because it teaches:
 - passing output values by reference
 - keeping ownership simple and local
 
+## Milestone 4: Input Parsing
+
+This milestone makes the CLI accept two cards from the command line.
+
+- `parse_rank()`
+  Converts text like `A`, `K`, `T`, or `10` into a `Rank`.
+- `parse_suit()`
+  Converts text like `s` or `h` into a `Suit`.
+- `parse_card()`
+  Converts text like `As` or `10h` into a `Card`.
+- `main(int argc, char* argv[])`
+  Reads the command-line arguments and validates them.
+
+This milestone is useful because it teaches:
+
+- command-line arguments
+- C-style strings with `const char*`
+- simple validation
+- returning `bool` for success or failure
+- separating parsing logic from CLI printing logic
+
 ## Next Steps
 
-1. Parse a couple of hole cards from the command line.
-2. Add a first simulation loop, even if it is naive.
-3. Measure it, then improve memory layout and performance on purpose.
+1. Add a first simulation loop, even if it is naive.
+2. Measure it, then improve memory layout and performance on purpose.
