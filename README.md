@@ -19,13 +19,19 @@ This version is intentionally light on scaffolding so the interesting parts of t
 ```bash
 cmake -S . -B build
 cmake --build build
+ctest --test-dir build --output-on-failure
 ./build/poker_cli As Kh
+./build/poker_cli As Ks Qs Js Ts
+./build/poker_cli As Ks Qs Js Ts 2d 3c
 ```
 
 Or with the convenience `Makefile`:
 
 ```bash
+make test
 make run ARGS="As Kh"
+make run ARGS="As Ks Qs Js Ts"
+make run ARGS="As Ks Qs Js Ts 2d 3c"
 ```
 
 ## What exists right now
@@ -36,6 +42,13 @@ make run ARGS="As Kh"
 - A `Card` model with `Suit`, `Rank`, and `Card`
 - A `Deck` model with reset and draw behavior
 - CLI parsing for two hole cards
+- A `HandCategory` type for poker hand strength vocabulary
+- An `EvaluatedHand` result type for future hand comparisons
+- A 5-card evaluator entry point plus rank/suit counting helpers
+- Straight detection, including the wheel straight
+- 5-card hand classification and hand-to-hand comparison
+- 7-card evaluation by choosing the best 5-card combination
+- A focused test suite for hand-ranking confidence checks
 - One tiny simulator class with a placeholder method
 
 ## Milestone 1: Project Basics
@@ -123,6 +136,142 @@ This milestone is useful because it teaches:
 - simple validation
 - returning `bool` for success or failure
 - separating parsing logic from CLI printing logic
+
+## Milestone 5.1: Hand Categories
+
+This step does not evaluate hands yet. It gives us the vocabulary we will use when we do.
+
+- `HandCategory`
+  Lists the standard poker hand categories from weakest to strongest.
+- `hand_category_name()`
+  Converts a category into readable text.
+
+This step is useful because it teaches:
+
+- creating a new domain type before writing logic around it
+- choosing enum order intentionally
+- separating poker terminology from evaluation code
+
+## Milestone 5.2: Evaluation Result Type
+
+This step defines the shape of the answer our evaluator will eventually return.
+
+- `EvaluatedHand`
+  Stores the hand category plus ordered tie-break ranks.
+- `tie_break_ranks`
+  A fixed-size array that will hold the ranks used to compare equal categories.
+- `tie_break_count`
+  Tells us how many of those ranks are actually meaningful.
+
+This step is useful because it teaches:
+
+- designing result types before implementing algorithms
+- fixed-size storage with `std::array`
+- planning comparison data separately from evaluation logic
+
+## Milestone 5.3 and 5.4: 5-Card Input Shape and Counting
+
+This step gives the evaluator a real 5-card function signature and adds the counting data it will use later.
+
+- `five_card_hand_size`
+  A named constant for the size of a 5-card hand.
+- `evaluate_5_card_hand()`
+  The entry point for evaluating exactly five cards.
+- `HandCounts`
+  Stores rank counts and suit counts for one 5-card hand.
+- `count_ranks_and_suits()`
+  Fills a `HandCounts` result from the cards in the hand.
+
+This step is useful because it teaches:
+
+- using `std::array<Card, 5>` to encode size in the type
+- preprocessing data before writing the full algorithm
+- converting enum values into array indexes carefully
+
+## Milestone 5.5: Straight Detection
+
+This step adds the logic for detecting whether a 5-card hand is a straight.
+
+- `StraightInfo`
+  Reports whether the hand is a straight and, if it is, what the high card is.
+- `detect_straight()`
+  Uses rank counts to test for five consecutive ranks.
+- Wheel support
+  Special handling for `A-2-3-4-5`, where the straight high card is `five`.
+
+This step is useful because it teaches:
+
+- scanning ordered data for consecutive patterns
+- representing special-case poker rules explicitly
+- separating one hand rule from the full evaluator
+
+## Milestone 5.6 and 5.7: Classification and Comparison
+
+This step turns the 5-card evaluator into a real classifier and adds comparison logic for evaluated hands.
+
+- `evaluate_5_card_hand()`
+  Now classifies all standard 5-card poker hands.
+- `compare_evaluated_hands()`
+  Compares two evaluated hands by category first, then by tie-break ranks.
+- Tie-break ordering
+  The evaluator fills `tie_break_ranks` in strength order so comparison can be simple and predictable.
+
+This step is useful because it teaches:
+
+- building an algorithm in clear rule order
+- encoding poker tie-break rules into data
+- separating evaluation from comparison
+
+## Milestone 5.8: CLI and Demo Integration
+
+This step exposes the 5-card evaluator through the CLI so we can try real hands from the terminal.
+
+- Two-card mode
+  Still works as the earlier parsing/demo mode.
+- Five-card mode
+  Evaluates a full 5-card poker hand from command-line input.
+- CLI output
+  Prints the hand category and the tie-break ranks used for comparisons.
+
+This step is useful because it teaches:
+
+- connecting library code to a user-facing entry point
+- keeping demo logic in `main()` while evaluator logic stays in the library
+- validating larger groups of input cards
+
+## Milestone 5.9: 7-Card Evaluation
+
+This step adds true Hold'em-style evaluation for 7 available cards.
+
+- `evaluate_7_card_hand()`
+  Tries every 5-card subset from the 7 cards and keeps the strongest result.
+- 21 combinations
+  A 7-card hand has exactly 21 distinct 5-card combinations.
+- CLI support
+  The command-line tool now accepts 7 cards and prints the best evaluated hand.
+
+This step is useful because it teaches:
+
+- solving a larger problem by reusing a smaller correct function
+- brute-force enumeration as a clear first implementation
+- moving closer to real Hold'em hand evaluation
+
+## Milestone 5.10: Confidence Pass
+
+This step adds a focused set of automated checks around the evaluator.
+
+- Category coverage
+  Tests all main 5-card hand categories.
+- Tie-break checks
+  Verifies important comparisons such as better pairs and better straights.
+- 7-card checks
+  Confirms the 7-card evaluator chooses the best 5-card combination.
+
+This step is useful because it teaches:
+
+- turning manual examples into repeatable tests
+- checking both classification and comparison behavior
+- building confidence before moving on to simulation
 
 ## Next Steps
 

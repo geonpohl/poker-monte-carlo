@@ -8,12 +8,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CTest)
+
 # Build our reusable code as a library target.
 # Right now the library is tiny, but later it will hold most of the poker logic.
 add_library(
     poker_core
     src/card.cpp
     src/deck.cpp
+    src/hand.cpp
     src/simulator.cpp
 )
 
@@ -25,3 +28,9 @@ add_executable(poker_cli apps/equity_cli.cpp)
 
 # Link the CLI against our library so main() can use poker_core code.
 target_link_libraries(poker_cli PRIVATE poker_core)
+
+if(BUILD_TESTING)
+    add_executable(poker_hand_tests tests/hand_tests.cpp)
+    target_link_libraries(poker_hand_tests PRIVATE poker_core)
+    add_test(NAME poker_hand_tests COMMAND poker_hand_tests)
+endif()

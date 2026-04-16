@@ -42,3 +42,35 @@ Improve CLI usability, output formatting, documentation, and repository organiza
 - Keep each step compileable
 - Prefer correct first, then fast
 - Add complexity only when we understand why it helps
+
+## Milestone 5 Breakdown
+
+1. Hand categories
+Define the poker hand categories we need to rank: high card, pair, two pair, three of a kind, straight, flush, full house, four of a kind, straight flush.
+
+2. Evaluation result type
+Create a small result type that stores both the hand category and the tie-break information needed to compare two hands.
+
+3. 5-card evaluator input shape
+Decide how a 5-card hand will be passed into the evaluator and add the function signature.
+
+4. Rank and suit counting
+Count ranks and suits in a 5-card hand so we can detect pairs, trips, quads, and flushes.
+
+5. Straight detection
+Add straight detection, including the wheel straight: A-2-3-4-5.
+
+6. 5-card category detection
+Use the counts plus straight/flush checks to classify the hand correctly.
+
+7. 5-card comparison
+Implement comparison logic so two evaluated 5-card hands can be ordered correctly.
+
+8. CLI/demo integration
+Add a small way to exercise the evaluator from the CLI so we can see real hands being evaluated.
+
+9. 7-card evaluation
+Extend to 7-card hands by checking all 5-card combinations and choosing the best result.
+
+10. Confidence pass
+Add a focused set of examples to verify each hand category and a few important tie-break cases.
