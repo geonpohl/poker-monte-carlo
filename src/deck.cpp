@@ -40,6 +40,17 @@ bool Deck::empty() const noexcept
     return next_card_index_ >= card_count;
 }
 
+void Deck::copy_remaining_cards(
+    std::array<Card, card_count>& out_cards,
+    std::size_t& out_count) const noexcept
+{
+    out_count = remaining();
+
+    for (std::size_t index = 0; index < out_count; ++index) {
+        out_cards[index] = cards_[next_card_index_ + index];
+    }
+}
+
 bool Deck::remove(const Card& card) noexcept
 {
     for (std::size_t index = next_card_index_; index < card_count; ++index) {

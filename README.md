@@ -34,6 +34,7 @@ make run ARGS="As Kh"
 make run ARGS="As Ks Qs Js Ts"
 make run ARGS="As Ks Qs Js Ts 2d 3c"
 make run ARGS="simulate As Ah Ks Kh 20000"
+make perf PERF_ARGS=200000
 ```
 
 ## What exists right now
@@ -314,6 +315,23 @@ This step is useful because it teaches:
 - testing edge cases, not just happy paths
 - validating simulation invariants explicitly
 - building trust before any performance-oriented refactors
+
+## Milestone 8: Performance Pass
+
+This step starts with measurement before optimization.
+
+- `poker_perf`
+  A small benchmark executable for the current heads-up simulator.
+- `make perf`
+  Builds a release-mode benchmark binary and runs it with a chosen iteration count.
+- Baseline-first workflow
+  We measure the current implementation before changing hot-path logic.
+
+This step is useful because it teaches:
+
+- benchmarking before optimizing
+- separating performance builds from normal debug-oriented builds
+- making each later optimization measurable
 
 ## Next Steps
 

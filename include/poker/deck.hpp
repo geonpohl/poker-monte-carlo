@@ -20,6 +20,10 @@ class Deck final {
     [[nodiscard]] std::size_t remaining() const noexcept;
     [[nodiscard]] bool empty() const noexcept;
 
+    void copy_remaining_cards(
+        std::array<Card, card_count>& out_cards,
+        std::size_t& out_count) const noexcept;
+
     // remove() marks a specific card as already used.
     // We will use this in the simulator to remove known hole cards and known board cards.
     bool remove(const Card& card) noexcept;

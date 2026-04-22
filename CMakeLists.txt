@@ -26,9 +26,11 @@ target_include_directories(poker_core PUBLIC include)
 
 # Build the command-line program.
 add_executable(poker_cli apps/equity_cli.cpp)
+add_executable(poker_perf apps/perf_benchmark.cpp)
 
 # Link the CLI against our library so main() can use poker_core code.
 target_link_libraries(poker_cli PRIVATE poker_core)
+target_link_libraries(poker_perf PRIVATE poker_core)
 
 if(BUILD_TESTING)
     add_executable(poker_hand_tests tests/hand_tests.cpp)

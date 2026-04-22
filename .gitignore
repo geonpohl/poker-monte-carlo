@@ -1,6 +1,6 @@
 .DS_Store
 /build/
+/build-release/
 /out/
 /cmake-build-*/
 /compile_commands.json
-

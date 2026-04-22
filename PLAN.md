@@ -74,3 +74,20 @@ Extend to 7-card hands by checking all 5-card combinations and choosing the best
 
 10. Confidence pass
 Add a focused set of examples to verify each hand category and a few important tie-break cases.
+
+## Milestone 8 Breakdown
+
+1. Baseline benchmark
+Add a small benchmark target so we can measure the current simulator before changing it.
+
+2. Hot-path review
+Identify where time is spent: deck preparation, random draws, 7-card evaluation, or result comparison.
+
+3. Low-risk optimizations
+Apply small changes that should not change behavior, such as removing repeated work or unnecessary copies.
+
+4. Re-measure
+Run the same benchmark after each optimization and compare the results.
+
+5. Higher-impact evaluator work
+Only after measuring, consider deeper evaluator or data-layout changes if they clearly matter.

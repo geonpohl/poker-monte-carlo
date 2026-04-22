@@ -4,6 +4,34 @@ namespace poker {
 
 namespace {
 
+// There are exactly 21 ways to choose 5 cards from 7.
+// Keeping them in one table lets the evaluator loop over fixed data instead of
+// rebuilding the same nested-loop structure on every call.
+constexpr std::array<std::array<std::size_t, five_card_hand_size>, 21>
+    kSevenChooseFiveCombinations{{
+        {{0, 1, 2, 3, 4}},
+        {{0, 1, 2, 3, 5}},
+        {{0, 1, 2, 3, 6}},
+        {{0, 1, 2, 4, 5}},
+        {{0, 1, 2, 4, 6}},
+        {{0, 1, 2, 5, 6}},
+        {{0, 1, 3, 4, 5}},
+        {{0, 1, 3, 4, 6}},
+        {{0, 1, 3, 5, 6}},
+        {{0, 1, 4, 5, 6}},
+        {{0, 2, 3, 4, 5}},
+        {{0, 2, 3, 4, 6}},
+        {{0, 2, 3, 5, 6}},
+        {{0, 2, 4, 5, 6}},
+        {{0, 3, 4, 5, 6}},
+        {{1, 2, 3, 4, 5}},
+        {{1, 2, 3, 4, 6}},
+        {{1, 2, 3, 5, 6}},
+        {{1, 2, 4, 5, 6}},
+        {{1, 3, 4, 5, 6}},
+        {{2, 3, 4, 5, 6}},
+    }};
+
 int rank_value(Rank rank) noexcept
 {
     return static_cast<int>(rank);
@@ -48,16 +76,6 @@ void push_tie_break_rank(EvaluatedHand& hand, Rank rank) noexcept
     if (hand.tie_break_count < hand.tie_break_ranks.size()) {
         hand.tie_break_ranks[hand.tie_break_count] = rank;
         ++hand.tie_break_count;
-    }
-}
-
-void push_all_present_ranks_descending(EvaluatedHand& hand, const HandCounts& counts) noexcept
-{
-    // We use int here instead of size_t because this loop needs to count downward to -1.
-    for (int index = 12; index >= 0; --index) {
-        if (counts.rank_counts[static_cast<std::size_t>(index)] > 0) {
-            push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(index)));
-        }
     }
 }
 
@@ -147,27 +165,36 @@ EvaluatedHand evaluate_5_card_hand(const std::array<Card, five_card_hand_size>& 
 
     int four_of_a_kind_index = -1;
     int three_of_a_kind_index = -1;
-    int high_pair_index = -1;
-    int low_pair_index = -1;
-    int kicker_index = -1;
+    std::array<int, 2> pair_indices{-1, -1};
+    std::size_t pair_count = 0;
+    std::array<int, 5> single_indices{-1, -1, -1, -1, -1};
+    std::size_t single_count = 0;
+    std::array<int, 5> present_rank_indices{-1, -1, -1, -1, -1};
+    std::size_t present_rank_count = 0;
 
-    // Scan from ace down to two so tie-break ranks naturally come out in strength order.
+    // Scan from ace down to two once and collect all the rank-shape information
+    // the later category checks will need.
     for (int index = 12; index >= 0; --index) {
         const int count = counts.rank_counts[static_cast<std::size_t>(index)];
+
+        if (count > 0) {
+            present_rank_indices[present_rank_count] = index;
+            ++present_rank_count;
+        }
 
         if (count == 4) {
             four_of_a_kind_index = index;
         } else if (count == 3) {
             three_of_a_kind_index = index;
         } else if (count == 2) {
-            if (high_pair_index == -1) {
-                high_pair_index = index;
-            } else {
-                low_pair_index = index;
+            if (pair_count < pair_indices.size()) {
+                pair_indices[pair_count] = index;
+                ++pair_count;
             }
         } else if (count == 1) {
-            if (kicker_index == -1) {
-                kicker_index = index;
+            if (single_count < single_indices.size()) {
+                single_indices[single_count] = index;
+                ++single_count;
             }
         }
     }
@@ -183,20 +210,23 @@ EvaluatedHand evaluate_5_card_hand(const std::array<Card, five_card_hand_size>& 
     if (four_of_a_kind_index != -1) {
         hand.category = HandCategory::four_of_a_kind;
         push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(four_of_a_kind_index)));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(kicker_index)));
+        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[0])));
         return hand;
     }
 
-    if (three_of_a_kind_index != -1 && high_pair_index != -1) {
+    if (three_of_a_kind_index != -1 && pair_count >= 1) {
         hand.category = HandCategory::full_house;
         push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(three_of_a_kind_index)));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(high_pair_index)));
+        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[0])));
         return hand;
     }
 
     if (flush) {
         hand.category = HandCategory::flush;
-        push_all_present_ranks_descending(hand, counts);
+        for (std::size_t index = 0; index < present_rank_count; ++index) {
+            push_tie_break_rank(
+                hand, rank_from_index(static_cast<std::size_t>(present_rank_indices[index])));
+        }
         return hand;
     }
 
@@ -210,71 +240,63 @@ EvaluatedHand evaluate_5_card_hand(const std::array<Card, five_card_hand_size>& 
         hand.category = HandCategory::three_of_a_kind;
         push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(three_of_a_kind_index)));
 
-        for (int index = 12; index >= 0; --index) {
-            if (counts.rank_counts[static_cast<std::size_t>(index)] == 1) {
-                push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(index)));
-            }
+        for (std::size_t index = 0; index < single_count; ++index) {
+            push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[index])));
         }
 
         return hand;
     }
 
-    if (high_pair_index != -1 && low_pair_index != -1) {
+    if (pair_count == 2) {
         hand.category = HandCategory::two_pair;
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(high_pair_index)));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(low_pair_index)));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(kicker_index)));
+        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[0])));
+        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[1])));
+        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[0])));
         return hand;
     }
 
-    if (high_pair_index != -1) {
+    if (pair_count == 1) {
         hand.category = HandCategory::pair;
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(high_pair_index)));
+        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[0])));
 
-        for (int index = 12; index >= 0; --index) {
-            if (counts.rank_counts[static_cast<std::size_t>(index)] == 1) {
-                push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(index)));
-            }
+        for (std::size_t index = 0; index < single_count; ++index) {
+            push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[index])));
         }
 
         return hand;
     }
 
     hand.category = HandCategory::high_card;
-    push_all_present_ranks_descending(hand, counts);
+    for (std::size_t index = 0; index < present_rank_count; ++index) {
+        push_tie_break_rank(
+            hand, rank_from_index(static_cast<std::size_t>(present_rank_indices[index])));
+    }
     return hand;
 }
 
 EvaluatedHand evaluate_7_card_hand(const std::array<Card, seven_card_hand_size>& cards) noexcept
 {
-    EvaluatedHand best_hand{};
-    bool has_best_hand = false;
+    std::array<Card, five_card_hand_size> candidate_cards{};
 
-    // A 7-card hand has 21 different 5-card combinations.
-    // We evaluate each one and keep the strongest result.
-    for (std::size_t first = 0; first < cards.size() - 4; ++first) {
-        for (std::size_t second = first + 1; second < cards.size() - 3; ++second) {
-            for (std::size_t third = second + 1; third < cards.size() - 2; ++third) {
-                for (std::size_t fourth = third + 1; fourth < cards.size() - 1; ++fourth) {
-                    for (std::size_t fifth = fourth + 1; fifth < cards.size(); ++fifth) {
-                        const std::array<Card, five_card_hand_size> candidate_cards{
-                            cards[first],
-                            cards[second],
-                            cards[third],
-                            cards[fourth],
-                            cards[fifth],
-                        };
+    // Seed best_hand from the first combination so we can avoid a branch inside the loop.
+    for (std::size_t card_index = 0; card_index < five_card_hand_size; ++card_index) {
+        candidate_cards[card_index] = cards[kSevenChooseFiveCombinations[0][card_index]];
+    }
 
-                        const EvaluatedHand candidate_hand = evaluate_5_card_hand(candidate_cards);
+    EvaluatedHand best_hand = evaluate_5_card_hand(candidate_cards);
 
-                        if (!has_best_hand ||
-                            compare_evaluated_hands(candidate_hand, best_hand) > 0) {
-                            best_hand = candidate_hand;
-                            has_best_hand = true;
-                        }
-                    }
-                }
-            }
+    for (std::size_t combination_index = 1; combination_index < kSevenChooseFiveCombinations.size();
+         ++combination_index) {
+        const auto& combination = kSevenChooseFiveCombinations[combination_index];
+
+        for (std::size_t card_index = 0; card_index < five_card_hand_size; ++card_index) {
+            candidate_cards[card_index] = cards[combination[card_index]];
+        }
+
+        const EvaluatedHand candidate_hand = evaluate_5_card_hand(candidate_cards);
+
+        if (compare_evaluated_hands(candidate_hand, best_hand) > 0) {
+            best_hand = candidate_hand;
         }
     }
 

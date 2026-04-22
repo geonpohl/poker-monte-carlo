@@ -3,6 +3,7 @@
 #include "poker/deck.hpp"
 #include "poker/hand.hpp"
 
+#include <algorithm>
 #include <array>
 #include <random>
 
@@ -73,8 +74,12 @@ bool validate_input(const HeadsUpSimulationInput& input, const char*& error_mess
     return true;
 }
 
-bool prepare_base_deck(const HeadsUpSimulationInput& input, Deck& deck) noexcept
+bool prepare_base_remaining_cards(
+    const HeadsUpSimulationInput& input,
+    std::array<Card, Deck::card_count>& remaining_cards,
+    std::size_t& remaining_count) noexcept
 {
+    Deck deck{};
     deck.reset();
 
     for (const Card& card : input.hero_hole) {
@@ -95,22 +100,8 @@ bool prepare_base_deck(const HeadsUpSimulationInput& input, Deck& deck) noexcept
         }
     }
 
+    deck.copy_remaining_cards(remaining_cards, remaining_count);
     return true;
-}
-
-std::array<Card, seven_card_hand_size> build_seven_card_hand(
-    const std::array<Card, hole_card_count>& hole_cards,
-    const std::array<Card, 5>& board) noexcept
-{
-    return std::array<Card, seven_card_hand_size>{
-        hole_cards[0],
-        hole_cards[1],
-        board[0],
-        board[1],
-        board[2],
-        board[3],
-        board[4],
-    };
 }
 
 }  // namespace
@@ -153,29 +144,61 @@ HeadsUpSimulationResult MonteCarloSimulator::simulate_heads_up(
         return result;
     }
 
-    Deck base_deck{};
-    if (!prepare_base_deck(input, base_deck)) {
+    std::array<Card, Deck::card_count> base_remaining_cards{};
+    std::size_t base_remaining_count = 0;
+
+    if (!prepare_base_remaining_cards(input, base_remaining_cards, base_remaining_count)) {
         result.error_message = "failed to prepare the deck";
         return result;
     }
 
     std::mt19937 rng(input.seed);
+    std::uniform_int_distribution<std::size_t> distribution{};
+
+    std::array<Card, seven_card_hand_size> hero_cards{
+        input.hero_hole[0],
+        input.hero_hole[1],
+        input.board[0],
+        input.board[1],
+        input.board[2],
+        input.board[3],
+        input.board[4],
+    };
+    std::array<Card, seven_card_hand_size> villain_cards{
+        input.villain_hole[0],
+        input.villain_hole[1],
+        input.board[0],
+        input.board[1],
+        input.board[2],
+        input.board[3],
+        input.board[4],
+    };
 
     for (std::size_t iteration = 0; iteration < input.iterations; ++iteration) {
-        Deck deck = base_deck;
-        std::array<Card, 5> full_board = input.board;
+        std::array<Card, Deck::card_count> remaining_cards{};
+        std::size_t remaining_count = base_remaining_count;
+
+        if (input.board_count < 5) {
+            std::copy_n(base_remaining_cards.data(), base_remaining_count, remaining_cards.data());
+        }
 
         for (std::size_t board_index = input.board_count; board_index < 5; ++board_index) {
-            if (!deck.draw_random(full_board[board_index], rng)) {
+            if (remaining_count == 0) {
                 result.error_message = "not enough cards left to complete the board";
                 return result;
             }
-        }
 
-        const std::array<Card, seven_card_hand_size> hero_cards =
-            build_seven_card_hand(input.hero_hole, full_board);
-        const std::array<Card, seven_card_hand_size> villain_cards =
-            build_seven_card_hand(input.villain_hole, full_board);
+            distribution.param(
+                std::uniform_int_distribution<std::size_t>::param_type(0, remaining_count - 1));
+            const std::size_t random_index = distribution(rng);
+            const Card drawn_card = remaining_cards[random_index];
+
+            hero_cards[board_index + 2] = drawn_card;
+            villain_cards[board_index + 2] = drawn_card;
+
+            --remaining_count;
+            std::swap(remaining_cards[random_index], remaining_cards[remaining_count]);
+        }
 
         const EvaluatedHand hero_hand = evaluate_7_card_hand(hero_cards);
         const EvaluatedHand villain_hand = evaluate_7_card_hand(villain_cards);
