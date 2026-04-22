@@ -7,12 +7,95 @@
 #include <cstring>
 #include <cstdlib>
 #include <iostream>
+#include <random>
 
 namespace {
+
+constexpr std::array<std::array<std::size_t, poker::five_card_hand_size>, 21>
+    kSevenChooseFiveCombinations{{
+        {{0, 1, 2, 3, 4}},
+        {{0, 1, 2, 3, 5}},
+        {{0, 1, 2, 3, 6}},
+        {{0, 1, 2, 4, 5}},
+        {{0, 1, 2, 4, 6}},
+        {{0, 1, 2, 5, 6}},
+        {{0, 1, 3, 4, 5}},
+        {{0, 1, 3, 4, 6}},
+        {{0, 1, 3, 5, 6}},
+        {{0, 1, 4, 5, 6}},
+        {{0, 2, 3, 4, 5}},
+        {{0, 2, 3, 4, 6}},
+        {{0, 2, 3, 5, 6}},
+        {{0, 2, 4, 5, 6}},
+        {{0, 3, 4, 5, 6}},
+        {{1, 2, 3, 4, 5}},
+        {{1, 2, 3, 4, 6}},
+        {{1, 2, 3, 5, 6}},
+        {{1, 2, 4, 5, 6}},
+        {{1, 3, 4, 5, 6}},
+        {{2, 3, 4, 5, 6}},
+    }};
 
 poker::Card make_card(poker::Rank rank, poker::Suit suit)
 {
     return poker::Card{rank, suit};
+}
+
+std::array<poker::Card, 52> make_full_deck()
+{
+    std::array<poker::Card, 52> deck{};
+    std::size_t index = 0;
+
+    for (poker::Suit suit : poker::all_suits) {
+        for (poker::Rank rank : poker::all_ranks) {
+            deck[index] = make_card(rank, suit);
+            ++index;
+        }
+    }
+
+    return deck;
+}
+
+void draw_random_seven_card_hand(
+    std::mt19937& rng,
+    std::array<poker::Card, poker::seven_card_hand_size>& out_cards)
+{
+    std::array<poker::Card, 52> deck = make_full_deck();
+
+    for (std::size_t draw_index = 0; draw_index < out_cards.size(); ++draw_index) {
+        std::uniform_int_distribution<std::size_t> distribution(draw_index, deck.size() - 1);
+        const std::size_t swap_index = distribution(rng);
+        std::swap(deck[draw_index], deck[swap_index]);
+        out_cards[draw_index] = deck[draw_index];
+    }
+}
+
+poker::HandStrength reference_evaluate_7_card_strength(
+    const std::array<poker::Card, poker::seven_card_hand_size>& cards)
+{
+    std::array<poker::Card, poker::five_card_hand_size> candidate_cards{};
+
+    for (std::size_t card_index = 0; card_index < poker::five_card_hand_size; ++card_index) {
+        candidate_cards[card_index] = cards[kSevenChooseFiveCombinations[0][card_index]];
+    }
+
+    poker::HandStrength best_strength = poker::evaluate_5_card_strength(candidate_cards);
+
+    for (std::size_t combination_index = 1; combination_index < kSevenChooseFiveCombinations.size();
+         ++combination_index) {
+        for (std::size_t card_index = 0; card_index < poker::five_card_hand_size; ++card_index) {
+            candidate_cards[card_index] =
+                cards[kSevenChooseFiveCombinations[combination_index][card_index]];
+        }
+
+        const poker::HandStrength candidate_strength = poker::evaluate_5_card_strength(candidate_cards);
+
+        if (candidate_strength > best_strength) {
+            best_strength = candidate_strength;
+        }
+    }
+
+    return best_strength;
 }
 
 void print_failure(const char* message)
@@ -68,6 +151,32 @@ bool expect_strength_comparison(
     }
 
     return expect(comparison == expected_result, message);
+}
+
+bool expect_seven_card_strength_matches_reference(
+    const std::array<poker::Card, poker::seven_card_hand_size>& cards,
+    const char* message)
+{
+    const poker::HandStrength direct_strength = poker::evaluate_7_card_strength(cards);
+    const poker::HandStrength reference_strength = reference_evaluate_7_card_strength(cards);
+    return expect(direct_strength == reference_strength, message);
+}
+
+bool expect_random_seven_card_strength_samples(std::size_t sample_count, const char* message)
+{
+    std::mt19937 rng(20260421U);
+    std::array<poker::Card, poker::seven_card_hand_size> cards{};
+
+    for (std::size_t sample_index = 0; sample_index < sample_count; ++sample_index) {
+        draw_random_seven_card_hand(rng, cards);
+
+        if (poker::evaluate_7_card_strength(cards) != reference_evaluate_7_card_strength(cards)) {
+            print_failure(message);
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool expect_seven_card_category(
@@ -374,6 +483,49 @@ int main()
              },
              poker::HandCategory::flush,
              "7-card evaluator should choose the best flush over a weaker trip hand") &&
+         ok;
+
+    ok = expect_seven_card_strength_matches_reference(
+             {
+                 make_card(poker::Rank::ace, poker::Suit::spades),
+                 make_card(poker::Rank::king, poker::Suit::spades),
+                 make_card(poker::Rank::queen, poker::Suit::spades),
+                 make_card(poker::Rank::jack, poker::Suit::spades),
+                 make_card(poker::Rank::ten, poker::Suit::spades),
+                 make_card(poker::Rank::two, poker::Suit::diamonds),
+                 make_card(poker::Rank::three, poker::Suit::clubs),
+             },
+             "direct 7-card evaluator should match reference on straight flush hand") &&
+         ok;
+
+    ok = expect_seven_card_strength_matches_reference(
+             {
+                 make_card(poker::Rank::ace, poker::Suit::clubs),
+                 make_card(poker::Rank::ace, poker::Suit::diamonds),
+                 make_card(poker::Rank::ace, poker::Suit::hearts),
+                 make_card(poker::Rank::king, poker::Suit::clubs),
+                 make_card(poker::Rank::king, poker::Suit::diamonds),
+                 make_card(poker::Rank::king, poker::Suit::hearts),
+                 make_card(poker::Rank::two, poker::Suit::spades),
+             },
+             "direct 7-card evaluator should match reference on double-trip full house hand") &&
+         ok;
+
+    ok = expect_seven_card_strength_matches_reference(
+             {
+                 make_card(poker::Rank::ace, poker::Suit::hearts),
+                 make_card(poker::Rank::queen, poker::Suit::hearts),
+                 make_card(poker::Rank::nine, poker::Suit::hearts),
+                 make_card(poker::Rank::six, poker::Suit::hearts),
+                 make_card(poker::Rank::three, poker::Suit::hearts),
+                 make_card(poker::Rank::two, poker::Suit::hearts),
+                 make_card(poker::Rank::king, poker::Suit::clubs),
+             },
+             "direct 7-card evaluator should match reference on 6-card flush hand") &&
+         ok;
+
+    ok = expect_random_seven_card_strength_samples(
+             5000, "direct 7-card evaluator should match reference on random samples") &&
          ok;
 
     poker::HeadsUpSimulationInput hero_wins_input{};

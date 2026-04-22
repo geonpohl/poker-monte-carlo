@@ -55,6 +55,7 @@ make perf PERF_ARGS=200000
 - A first heads-up Monte Carlo simulation loop
 - Expanded simulator correctness and edge-case checks
 - One tiny simulator class with a placeholder method
+- A dedicated optimization history in [OPTIMIZATIONS.md](/Users/geonpohl/Projects/poker-monte-carlo/OPTIMIZATIONS.md)
 
 ## Milestone 1: Project Basics
 
@@ -318,27 +319,15 @@ This step is useful because it teaches:
 
 ## Milestone 8: Performance Pass
 
-This step starts with measurement before optimization.
+This milestone is now documented in [OPTIMIZATIONS.md](/Users/geonpohl/Projects/poker-monte-carlo/OPTIMIZATIONS.md).
 
-- `poker_perf`
-  A small benchmark executable for the current heads-up simulator.
-- `make perf`
-  Builds a release-mode benchmark binary and runs it with a chosen iteration count.
-- Baseline-first workflow
-  We measure the current implementation before changing hot-path logic.
-- Packed hand strength
-  The evaluator now has a score-only fast path for simulator comparisons, while
-  the readable `EvaluatedHand` form is still available for CLI output and tests.
+That file contains:
 
-This step is useful because it teaches:
-
-- benchmarking before optimizing
-- separating performance builds from normal debug-oriented builds
-- making each later optimization measurable
-
-On the current benchmark scenario (`As Ah` vs `Ks Kh` preflop, `200000` iterations),
-the kept optimizations moved the simulator from roughly `487k` iterations/sec to
-roughly `660k` iterations/sec on this machine.
+- the benchmark setup
+- each optimization we tried
+- why we made each change
+- what improvements we measured
+- what we reverted and why
 
 ## Next Steps
 

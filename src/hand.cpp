@@ -4,33 +4,15 @@ namespace poker {
 
 namespace {
 
-// There are exactly 21 ways to choose 5 cards from 7.
-// Keeping them in one table lets the evaluator loop over fixed data instead of
-// rebuilding the same nested-loop structure on every call.
-constexpr std::array<std::array<std::size_t, five_card_hand_size>, 21>
-    kSevenChooseFiveCombinations{{
-        {{0, 1, 2, 3, 4}},
-        {{0, 1, 2, 3, 5}},
-        {{0, 1, 2, 3, 6}},
-        {{0, 1, 2, 4, 5}},
-        {{0, 1, 2, 4, 6}},
-        {{0, 1, 2, 5, 6}},
-        {{0, 1, 3, 4, 5}},
-        {{0, 1, 3, 4, 6}},
-        {{0, 1, 3, 5, 6}},
-        {{0, 1, 4, 5, 6}},
-        {{0, 2, 3, 4, 5}},
-        {{0, 2, 3, 4, 6}},
-        {{0, 2, 3, 5, 6}},
-        {{0, 2, 4, 5, 6}},
-        {{0, 3, 4, 5, 6}},
-        {{1, 2, 3, 4, 5}},
-        {{1, 2, 3, 4, 6}},
-        {{1, 2, 3, 5, 6}},
-        {{1, 2, 4, 5, 6}},
-        {{1, 3, 4, 5, 6}},
-        {{2, 3, 4, 5, 6}},
-    }};
+constexpr std::uint16_t kWheelStraightMask =
+    static_cast<std::uint16_t>((1U << 12U) | (1U << 0U) | (1U << 1U) | (1U << 2U) | (1U << 3U));
+
+struct SevenCardSummary {
+    std::array<int, 13> rank_counts{}; // how many of each ranks we have
+    std::array<int, 4> suit_counts{}; // how many of each suits we have
+    std::array<std::uint16_t, 4> suit_rank_masks{}; // which ranks exist in each suit
+    std::uint16_t rank_mask{0}; // which ranks exist overall
+};
 
 int rank_value(Rank rank) noexcept
 {
@@ -45,6 +27,11 @@ int category_value(HandCategory category) noexcept
 int rank_value_from_index(int index) noexcept
 {
     return index + static_cast<int>(Rank::two);
+}
+
+std::uint16_t rank_bit_from_index(int index) noexcept
+{
+    return static_cast<std::uint16_t>(1U << static_cast<unsigned>(index));
 }
 
 std::size_t tie_break_count_for_category(HandCategory category) noexcept
@@ -116,6 +103,92 @@ EvaluatedHand decode_strength(HandStrength strength) noexcept
     }
 
     return hand;
+}
+
+int highest_straight_high_rank_from_mask(std::uint16_t rank_mask) noexcept
+{
+    for (int high_index = 12; high_index >= 4; --high_index) {
+        const std::uint16_t window_mask =
+            static_cast<std::uint16_t>(0x1FU << static_cast<unsigned>(high_index - 4));
+
+        if ((rank_mask & window_mask) == window_mask) {
+            return rank_value_from_index(high_index);
+        }
+    }
+
+    if ((rank_mask & kWheelStraightMask) == kWheelStraightMask) {
+        return rank_value(Rank::five);
+    }
+
+    return 0;
+}
+
+void collect_top_rank_values_from_mask(
+    std::uint16_t rank_mask,
+    std::array<int, 5>& out_rank_values,
+    std::size_t rank_count) noexcept
+{
+    std::size_t out_index = 0;
+
+    for (int rank_index_value = 12; rank_index_value >= 0 && out_index < rank_count;
+         --rank_index_value) {
+        if ((rank_mask & rank_bit_from_index(rank_index_value)) != 0) {
+            out_rank_values[out_index] = rank_value_from_index(rank_index_value);
+            ++out_index;
+        }
+    }
+}
+
+int highest_other_rank_index(
+    const std::array<int, 13>& rank_counts,
+    int excluded_index0,
+    int excluded_index1 = -1) noexcept
+{
+    for (int index = 12; index >= 0; --index) {
+        if (index != excluded_index0 && index != excluded_index1 &&
+            rank_counts[static_cast<std::size_t>(index)] > 0) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
+void collect_highest_other_rank_indices(
+    const std::array<int, 13>& rank_counts,
+    int excluded_index0,
+    std::array<int, 3>& out_indices,
+    std::size_t requested_count,
+    int excluded_index1 = -1) noexcept
+{
+    std::size_t out_count = 0;
+
+    for (int index = 12; index >= 0 && out_count < requested_count; --index) {
+        if (index != excluded_index0 && index != excluded_index1 &&
+            rank_counts[static_cast<std::size_t>(index)] > 0) {
+            out_indices[out_count] = index;
+            ++out_count;
+        }
+    }
+}
+
+SevenCardSummary summarize_seven_cards(const std::array<Card, seven_card_hand_size>& cards) noexcept
+{
+    SevenCardSummary summary{};
+
+    for (const Card& card : cards) {
+        const std::size_t current_rank_index =
+            static_cast<std::size_t>(static_cast<int>(card.rank) - static_cast<int>(Rank::two));
+        const std::size_t current_suit_index = static_cast<std::size_t>(card.suit);
+
+        ++summary.rank_counts[current_rank_index];
+        ++summary.suit_counts[current_suit_index];
+        summary.suit_rank_masks[current_suit_index] |=
+            rank_bit_from_index(static_cast<int>(current_rank_index));
+        summary.rank_mask |= rank_bit_from_index(static_cast<int>(current_rank_index));
+    }
+
+    return summary;
 }
 
 std::size_t rank_index(Rank rank) noexcept
@@ -353,31 +426,160 @@ EvaluatedHand evaluate_5_card_hand(const std::array<Card, five_card_hand_size>& 
 
 HandStrength evaluate_7_card_strength(const std::array<Card, seven_card_hand_size>& cards) noexcept
 {
-    std::array<Card, five_card_hand_size> candidate_cards{};
+    const SevenCardSummary summary = summarize_seven_cards(cards);
 
-    // Seed best_hand from the first combination so we can avoid a branch inside the loop.
-    for (std::size_t card_index = 0; card_index < five_card_hand_size; ++card_index) {
-        candidate_cards[card_index] = cards[kSevenChooseFiveCombinations[0][card_index]];
-    }
+    // A 7-card evaluator is worth doing directly because the simulator calls it
+    // twice per iteration. We summarize the hand once, then choose the best
+    // category in normal poker-hand order.
 
-    HandStrength best_strength = evaluate_5_card_strength(candidate_cards);
+    HandStrength best_flush_strength = 0;
 
-    for (std::size_t combination_index = 1; combination_index < kSevenChooseFiveCombinations.size();
-         ++combination_index) {
-        const auto& combination = kSevenChooseFiveCombinations[combination_index];
-
-        for (std::size_t card_index = 0; card_index < five_card_hand_size; ++card_index) {
-            candidate_cards[card_index] = cards[combination[card_index]];
+    for (std::size_t suit = 0; suit < summary.suit_counts.size(); ++suit) {
+        if (summary.suit_counts[suit] < 5) {
+            continue;
         }
 
-        const HandStrength candidate_strength = evaluate_5_card_strength(candidate_cards);
+        const std::uint16_t suit_rank_mask = summary.suit_rank_masks[suit];
+        const int straight_flush_high_rank = highest_straight_high_rank_from_mask(suit_rank_mask);
 
-        if (candidate_strength > best_strength) {
-            best_strength = candidate_strength;
+        if (straight_flush_high_rank != 0) {
+            return pack_strength(
+                HandCategory::straight_flush, straight_flush_high_rank, 0, 0, 0, 0);
+        }
+
+        std::array<int, 5> flush_rank_values{0, 0, 0, 0, 0};
+        collect_top_rank_values_from_mask(suit_rank_mask, flush_rank_values, 5);
+
+        const HandStrength flush_strength = pack_strength(
+            HandCategory::flush,
+            flush_rank_values[0],
+            flush_rank_values[1],
+            flush_rank_values[2],
+            flush_rank_values[3],
+            flush_rank_values[4]);
+
+        if (flush_strength > best_flush_strength) {
+            best_flush_strength = flush_strength;
         }
     }
 
-    return best_strength;
+    int four_of_a_kind_index = -1;
+    std::array<int, 2> three_of_a_kind_indices{-1, -1};
+    std::size_t three_of_a_kind_count = 0;
+    std::array<int, 3> pair_indices{-1, -1, -1};
+    std::size_t pair_count = 0;
+    std::array<int, 7> distinct_rank_indices{-1, -1, -1, -1, -1, -1, -1};
+    std::size_t distinct_rank_count = 0;
+
+    for (int index = 12; index >= 0; --index) {
+        const int count = summary.rank_counts[static_cast<std::size_t>(index)];
+
+        if (count > 0) {
+            distinct_rank_indices[distinct_rank_count] = index;
+            ++distinct_rank_count;
+        }
+
+        if (count == 4) {
+            four_of_a_kind_index = index;
+        } else if (count == 3) {
+            if (three_of_a_kind_count < three_of_a_kind_indices.size()) {
+                three_of_a_kind_indices[three_of_a_kind_count] = index;
+                ++three_of_a_kind_count;
+            }
+        } else if (count == 2) {
+            if (pair_count < pair_indices.size()) {
+                pair_indices[pair_count] = index;
+                ++pair_count;
+            }
+        }
+    }
+
+    if (four_of_a_kind_index != -1) {
+        const int kicker_index = highest_other_rank_index(summary.rank_counts, four_of_a_kind_index);
+        return pack_strength(
+            HandCategory::four_of_a_kind,
+            rank_value_from_index(four_of_a_kind_index),
+            rank_value_from_index(kicker_index),
+            0,
+            0,
+            0);
+    }
+
+    if (three_of_a_kind_count >= 2) {
+        return pack_strength(
+            HandCategory::full_house,
+            rank_value_from_index(three_of_a_kind_indices[0]),
+            rank_value_from_index(three_of_a_kind_indices[1]),
+            0,
+            0,
+            0);
+    }
+
+    if (three_of_a_kind_count >= 1 && pair_count >= 1) {
+        return pack_strength(
+            HandCategory::full_house,
+            rank_value_from_index(three_of_a_kind_indices[0]),
+            rank_value_from_index(pair_indices[0]),
+            0,
+            0,
+            0);
+    }
+
+    if (best_flush_strength != 0) {
+        return best_flush_strength;
+    }
+
+    const int straight_high_rank = highest_straight_high_rank_from_mask(summary.rank_mask);
+    if (straight_high_rank != 0) {
+        return pack_strength(HandCategory::straight, straight_high_rank, 0, 0, 0, 0);
+    }
+
+    if (three_of_a_kind_count >= 1) {
+        std::array<int, 3> kicker_indices{-1, -1, -1};
+        collect_highest_other_rank_indices(
+            summary.rank_counts, three_of_a_kind_indices[0], kicker_indices, 2);
+
+        return pack_strength(
+            HandCategory::three_of_a_kind,
+            rank_value_from_index(three_of_a_kind_indices[0]),
+            rank_value_from_index(kicker_indices[0]),
+            rank_value_from_index(kicker_indices[1]),
+            0,
+            0);
+    }
+
+    if (pair_count >= 2) {
+        const int kicker_index =
+            highest_other_rank_index(summary.rank_counts, pair_indices[0], pair_indices[1]);
+        return pack_strength(
+            HandCategory::two_pair,
+            rank_value_from_index(pair_indices[0]),
+            rank_value_from_index(pair_indices[1]),
+            rank_value_from_index(kicker_index),
+            0,
+            0);
+    }
+
+    if (pair_count >= 1) {
+        std::array<int, 3> kicker_indices{-1, -1, -1};
+        collect_highest_other_rank_indices(summary.rank_counts, pair_indices[0], kicker_indices, 3);
+
+        return pack_strength(
+            HandCategory::pair,
+            rank_value_from_index(pair_indices[0]),
+            rank_value_from_index(kicker_indices[0]),
+            rank_value_from_index(kicker_indices[1]),
+            rank_value_from_index(kicker_indices[2]),
+            0);
+    }
+
+    return pack_strength(
+        HandCategory::high_card,
+        rank_value_from_index(distinct_rank_indices[0]),
+        rank_value_from_index(distinct_rank_indices[1]),
+        rank_value_from_index(distinct_rank_indices[2]),
+        rank_value_from_index(distinct_rank_indices[3]),
+        rank_value_from_index(distinct_rank_indices[4]));
 }
 
 EvaluatedHand evaluate_7_card_hand(const std::array<Card, seven_card_hand_size>& cards) noexcept

@@ -92,7 +92,5 @@ Run the same benchmark after each optimization and compare the results.
 5. Higher-impact evaluator work
 Only after measuring, consider deeper evaluator or data-layout changes if they clearly matter.
 
-Current Milestone 8 progress:
-- baseline benchmark added
-- low-risk evaluator and simulation-loop cleanups measured
-- packed hand-strength fast path kept after benchmark validation
+Milestone 8 implementation details and results now live in
+[OPTIMIZATIONS.md](/Users/geonpohl/Projects/poker-monte-carlo/OPTIMIZATIONS.md).
