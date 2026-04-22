@@ -4,6 +4,7 @@
 #include "poker/simulator.hpp"
 
 #include <array>
+#include <cstring>
 #include <cstdlib>
 #include <iostream>
 
@@ -84,7 +85,7 @@ void print_tie_break_ranks(const poker::EvaluatedHand& hand)
 
 int main(int argc, char* argv[])
 {
-    if (argc >= 2 && std::string_view(argv[1]) == "simulate") {
+    if (argc >= 2 && std::strcmp(argv[1], "simulate") == 0) {
         if (argc != 6 && argc != 7) {
             print_usage(argv[0]);
             return EXIT_FAILURE;

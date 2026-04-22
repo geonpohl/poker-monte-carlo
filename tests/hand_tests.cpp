@@ -3,6 +3,8 @@
 #include "poker/simulator.hpp"
 
 #include <array>
+#include <cmath>
+#include <cstring>
 #include <cstdlib>
 #include <iostream>
 
@@ -72,6 +74,24 @@ bool expect_simulation_result(
         result.success && result.hero_wins == expected_hero_wins &&
             result.villain_wins == expected_villain_wins && result.ties == expected_ties,
         message);
+}
+
+bool expect_simulation_failure(
+    const poker::HeadsUpSimulationInput& input,
+    const char* expected_error_message,
+    const char* message)
+{
+    const poker::MonteCarloSimulator simulator{};
+    const poker::HeadsUpSimulationResult result = simulator.simulate_heads_up(input);
+
+    return expect(
+        !result.success && std::strcmp(result.error_message, expected_error_message) == 0,
+        message);
+}
+
+bool expect_approximately_equal(double left, double right, double tolerance, const char* message)
+{
+    return expect(std::fabs(left - right) <= tolerance, message);
 }
 
 }  // namespace
@@ -285,6 +305,20 @@ int main()
              "7-card evaluator should find the best full house") &&
          ok;
 
+    ok = expect_seven_card_category(
+             {
+                 make_card(poker::Rank::two, poker::Suit::hearts),
+                 make_card(poker::Rank::four, poker::Suit::hearts),
+                 make_card(poker::Rank::six, poker::Suit::hearts),
+                 make_card(poker::Rank::eight, poker::Suit::hearts),
+                 make_card(poker::Rank::ace, poker::Suit::hearts),
+                 make_card(poker::Rank::ace, poker::Suit::clubs),
+                 make_card(poker::Rank::ace, poker::Suit::diamonds),
+             },
+             poker::HandCategory::flush,
+             "7-card evaluator should choose the best flush over a weaker trip hand") &&
+         ok;
+
     poker::HeadsUpSimulationInput hero_wins_input{};
     hero_wins_input.hero_hole = {
         make_card(poker::Rank::ace, poker::Suit::clubs),
@@ -337,6 +371,76 @@ int main()
              "simulation should count ties when both players share the same best hand") &&
          ok;
 
+    poker::HeadsUpSimulationInput invalid_iterations_input{};
+    invalid_iterations_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::king, poker::Suit::clubs),
+    };
+    invalid_iterations_input.villain_hole = {
+        make_card(poker::Rank::queen, poker::Suit::clubs),
+        make_card(poker::Rank::jack, poker::Suit::clubs),
+    };
+    invalid_iterations_input.iterations = 0;
+    ok = expect_simulation_failure(
+             invalid_iterations_input,
+             "iterations must be greater than zero",
+             "simulation should reject zero iterations") &&
+         ok;
+
+    poker::HeadsUpSimulationInput invalid_board_count_input{};
+    invalid_board_count_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::king, poker::Suit::clubs),
+    };
+    invalid_board_count_input.villain_hole = {
+        make_card(poker::Rank::queen, poker::Suit::clubs),
+        make_card(poker::Rank::jack, poker::Suit::clubs),
+    };
+    invalid_board_count_input.board_count = 6;
+    ok = expect_simulation_failure(
+             invalid_board_count_input,
+             "board_count cannot be greater than 5",
+             "simulation should reject board_count values above 5") &&
+         ok;
+
+    poker::HeadsUpSimulationInput duplicate_card_input{};
+    duplicate_card_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::king, poker::Suit::clubs),
+    };
+    duplicate_card_input.villain_hole = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::queen, poker::Suit::clubs),
+    };
+    ok = expect_simulation_failure(
+             duplicate_card_input,
+             "duplicate cards are not allowed",
+             "simulation should reject duplicate cards across both players") &&
+         ok;
+
+    poker::HeadsUpSimulationInput duplicate_board_input{};
+    duplicate_board_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::king, poker::Suit::clubs),
+    };
+    duplicate_board_input.villain_hole = {
+        make_card(poker::Rank::queen, poker::Suit::clubs),
+        make_card(poker::Rank::jack, poker::Suit::clubs),
+    };
+    duplicate_board_input.board = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::two, poker::Suit::diamonds),
+        make_card(poker::Rank::three, poker::Suit::hearts),
+        make_card(poker::Rank::four, poker::Suit::spades),
+        make_card(poker::Rank::five, poker::Suit::clubs),
+    };
+    duplicate_board_input.board_count = 1;
+    ok = expect_simulation_failure(
+             duplicate_board_input,
+             "duplicate cards are not allowed",
+             "simulation should reject duplicate cards between hole cards and the known board") &&
+         ok;
+
     const poker::MonteCarloSimulator simulator{};
     poker::HeadsUpSimulationInput preflop_input{};
     preflop_input.hero_hole = {
@@ -356,6 +460,44 @@ int main()
                  preflop_result.hero_wins + preflop_result.villain_wins + preflop_result.ties ==
                      preflop_result.iterations,
              "simulation counts should sum to the total number of iterations") &&
+         ok;
+
+    ok = expect_approximately_equal(
+             preflop_result.hero_equity() + preflop_result.villain_equity(),
+             1.0,
+             1e-12,
+             "hero and villain equity should add up to 1.0") &&
+         ok;
+
+    poker::HeadsUpSimulationInput seeded_input{};
+    seeded_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::spades),
+        make_card(poker::Rank::queen, poker::Suit::spades),
+    };
+    seeded_input.villain_hole = {
+        make_card(poker::Rank::king, poker::Suit::hearts),
+        make_card(poker::Rank::jack, poker::Suit::hearts),
+    };
+    seeded_input.board = {
+        make_card(poker::Rank::two, poker::Suit::clubs),
+        make_card(poker::Rank::seven, poker::Suit::diamonds),
+        make_card(poker::Rank::nine, poker::Suit::spades),
+        make_card(poker::Rank::three, poker::Suit::hearts),
+        make_card(poker::Rank::four, poker::Suit::clubs),
+    };
+    seeded_input.board_count = 3;
+    seeded_input.iterations = 100;
+    seeded_input.seed = 42;
+
+    const poker::HeadsUpSimulationResult first_seeded_run = simulator.simulate_heads_up(seeded_input);
+    const poker::HeadsUpSimulationResult second_seeded_run = simulator.simulate_heads_up(seeded_input);
+
+    ok = expect(
+             first_seeded_run.success && second_seeded_run.success &&
+                 first_seeded_run.hero_wins == second_seeded_run.hero_wins &&
+                 first_seeded_run.villain_wins == second_seeded_run.villain_wins &&
+                 first_seeded_run.ties == second_seeded_run.ties,
+             "simulation should be deterministic when the seed and input are the same") &&
          ok;
 
     return ok ? EXIT_SUCCESS : EXIT_FAILURE;

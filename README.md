@@ -52,6 +52,7 @@ make run ARGS="simulate As Ah Ks Kh 20000"
 - 7-card evaluation by choosing the best 5-card combination
 - A focused test suite for hand-ranking confidence checks
 - A first heads-up Monte Carlo simulation loop
+- Expanded simulator correctness and edge-case checks
 - One tiny simulator class with a placeholder method
 
 ## Milestone 1: Project Basics
@@ -294,6 +295,25 @@ This step is useful because it teaches:
 - reusing the hand evaluator inside a larger loop
 - random sampling without replacement
 - separating simulation input, output, and validation
+
+## Milestone 7: Correctness Pass
+
+This step broadens the automated checks around both the evaluator and the simulator.
+
+- Simulator validation
+  Tests invalid iterations, invalid board sizes, and duplicate-card rejection.
+- Deterministic runs
+  Confirms the same seeded input produces the same results.
+- Equity sanity
+  Checks that win/loss/tie counts and computed equities stay internally consistent.
+- More hand-selection cases
+  Adds additional 7-card best-hand checks.
+
+This step is useful because it teaches:
+
+- testing edge cases, not just happy paths
+- validating simulation invariants explicitly
+- building trust before any performance-oriented refactors
 
 ## Next Steps
 
