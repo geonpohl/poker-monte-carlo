@@ -16,10 +16,14 @@ void print_usage(const char* program_name)
     std::cout << "  " << program_name << " <card1> <card2> <card3> <card4> <card5>\n";
     std::cout << "  " << program_name
               << " <card1> <card2> <card3> <card4> <card5> <card6> <card7>\n";
+    std::cout << "  " << program_name << " simulate <hero1> <hero2> <villain1> <villain2>\n";
+    std::cout << "  " << program_name
+              << " simulate <hero1> <hero2> <villain1> <villain2> <iterations>\n";
     std::cout << "Examples:\n";
     std::cout << "  " << program_name << " As Kh\n";
     std::cout << "  " << program_name << " As Ks Qs Js Ts\n";
     std::cout << "  " << program_name << " As Ks Qs Js Ts 2d 3c\n";
+    std::cout << "  " << program_name << " simulate As Ah Ks Kh 20000\n";
     std::cout << "Cards use rank+suit, such as As, Td, 10h, or 2c.\n";
 }
 
@@ -32,6 +36,19 @@ void print_card(const poker::Card& card)
 bool cards_equal(const poker::Card& left, const poker::Card& right)
 {
     return left.rank == right.rank && left.suit == right.suit;
+}
+
+bool parse_iterations(const char* text, std::size_t& out_iterations)
+{
+    char* end = nullptr;
+    const unsigned long long parsed_value = std::strtoull(text, &end, 10);
+
+    if (text == end || *end != '\0' || parsed_value == 0) {
+        return false;
+    }
+
+    out_iterations = static_cast<std::size_t>(parsed_value);
+    return true;
 }
 
 template <std::size_t N>
@@ -67,6 +84,72 @@ void print_tie_break_ranks(const poker::EvaluatedHand& hand)
 
 int main(int argc, char* argv[])
 {
+    if (argc >= 2 && std::string_view(argv[1]) == "simulate") {
+        if (argc != 6 && argc != 7) {
+            print_usage(argv[0]);
+            return EXIT_FAILURE;
+        }
+
+        poker::HeadsUpSimulationInput input{};
+
+        if (!poker::parse_card(argv[2], input.hero_hole[0])) {
+            std::cerr << "Could not parse hero card 1: " << argv[2] << '\n';
+            return EXIT_FAILURE;
+        }
+
+        if (!poker::parse_card(argv[3], input.hero_hole[1])) {
+            std::cerr << "Could not parse hero card 2: " << argv[3] << '\n';
+            return EXIT_FAILURE;
+        }
+
+        if (!poker::parse_card(argv[4], input.villain_hole[0])) {
+            std::cerr << "Could not parse villain card 1: " << argv[4] << '\n';
+            return EXIT_FAILURE;
+        }
+
+        if (!poker::parse_card(argv[5], input.villain_hole[1])) {
+            std::cerr << "Could not parse villain card 2: " << argv[5] << '\n';
+            return EXIT_FAILURE;
+        }
+
+        if (argc == 7 && !parse_iterations(argv[6], input.iterations)) {
+            std::cerr << "Could not parse iterations: " << argv[6] << '\n';
+            return EXIT_FAILURE;
+        }
+
+        const poker::MonteCarloSimulator simulator{};
+        const poker::HeadsUpSimulationResult result = simulator.simulate_heads_up(input);
+
+        if (!result.success) {
+            std::cerr << "Simulation error: " << result.error_message << '\n';
+            return EXIT_FAILURE;
+        }
+
+        std::cout << "poker-monte-carlo heads-up simulation\n";
+        std::cout << "Hero:\n";
+        std::cout << "  ";
+        print_card(input.hero_hole[0]);
+        std::cout << '\n';
+        std::cout << "  ";
+        print_card(input.hero_hole[1]);
+        std::cout << '\n';
+        std::cout << "Villain:\n";
+        std::cout << "  ";
+        print_card(input.villain_hole[0]);
+        std::cout << '\n';
+        std::cout << "  ";
+        print_card(input.villain_hole[1]);
+        std::cout << '\n';
+        std::cout << "Iterations: " << result.iterations << '\n';
+        std::cout << "Hero wins: " << result.hero_wins << '\n';
+        std::cout << "Villain wins: " << result.villain_wins << '\n';
+        std::cout << "Ties: " << result.ties << '\n';
+        std::cout << "Hero equity: " << result.hero_equity() << '\n';
+        std::cout << "Villain equity: " << result.villain_equity() << '\n';
+
+        return EXIT_SUCCESS;
+    }
+
     if (argc != 3 && argc != 6 && argc != 8) {
         print_usage(argv[0]);
         return EXIT_FAILURE;

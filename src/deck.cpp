@@ -1,5 +1,7 @@
 #include "poker/deck.hpp"
 
+#include <utility>
+
 namespace poker {
 
 Deck::Deck() noexcept
@@ -36,6 +38,19 @@ std::size_t Deck::remaining() const noexcept
 bool Deck::empty() const noexcept
 {
     return next_card_index_ >= card_count;
+}
+
+bool Deck::remove(const Card& card) noexcept
+{
+    for (std::size_t index = next_card_index_; index < card_count; ++index) {
+        if (cards_[index] == card) {
+            std::swap(cards_[next_card_index_], cards_[index]);
+            ++next_card_index_;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool Deck::draw(Card& out_card) noexcept

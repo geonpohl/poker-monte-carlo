@@ -23,6 +23,7 @@ ctest --test-dir build --output-on-failure
 ./build/poker_cli As Kh
 ./build/poker_cli As Ks Qs Js Ts
 ./build/poker_cli As Ks Qs Js Ts 2d 3c
+./build/poker_cli simulate As Ah Ks Kh 20000
 ```
 
 Or with the convenience `Makefile`:
@@ -32,6 +33,7 @@ make test
 make run ARGS="As Kh"
 make run ARGS="As Ks Qs Js Ts"
 make run ARGS="As Ks Qs Js Ts 2d 3c"
+make run ARGS="simulate As Ah Ks Kh 20000"
 ```
 
 ## What exists right now
@@ -49,6 +51,7 @@ make run ARGS="As Ks Qs Js Ts 2d 3c"
 - 5-card hand classification and hand-to-hand comparison
 - 7-card evaluation by choosing the best 5-card combination
 - A focused test suite for hand-ranking confidence checks
+- A first heads-up Monte Carlo simulation loop
 - One tiny simulator class with a placeholder method
 
 ## Milestone 1: Project Basics
@@ -272,6 +275,25 @@ This step is useful because it teaches:
 - turning manual examples into repeatable tests
 - checking both classification and comparison behavior
 - building confidence before moving on to simulation
+
+## Milestone 6: First Monte Carlo Loop
+
+This step adds a first real heads-up equity simulation loop.
+
+- `simulate_heads_up()`
+  Repeats random board completion and counts wins, losses, and ties.
+- `HeadsUpSimulationInput`
+  Stores hero cards, villain cards, known board cards, iteration count, and seed.
+- `HeadsUpSimulationResult`
+  Stores the simulation counts plus computed equity values.
+- `simulate` CLI mode
+  Lets us run a basic heads-up simulation from the terminal.
+
+This step is useful because it teaches:
+
+- reusing the hand evaluator inside a larger loop
+- random sampling without replacement
+- separating simulation input, output, and validation
 
 ## Next Steps
 

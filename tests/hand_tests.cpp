@@ -1,5 +1,6 @@
 #include "poker/card.hpp"
 #include "poker/hand.hpp"
+#include "poker/simulator.hpp"
 
 #include <array>
 #include <cstdlib>
@@ -55,6 +56,22 @@ bool expect_seven_card_category(
 {
     const poker::EvaluatedHand hand = poker::evaluate_7_card_hand(cards);
     return expect(hand.category == expected_category, message);
+}
+
+bool expect_simulation_result(
+    const poker::HeadsUpSimulationInput& input,
+    std::size_t expected_hero_wins,
+    std::size_t expected_villain_wins,
+    std::size_t expected_ties,
+    const char* message)
+{
+    const poker::MonteCarloSimulator simulator{};
+    const poker::HeadsUpSimulationResult result = simulator.simulate_heads_up(input);
+
+    return expect(
+        result.success && result.hero_wins == expected_hero_wins &&
+            result.villain_wins == expected_villain_wins && result.ties == expected_ties,
+        message);
 }
 
 }  // namespace
@@ -266,6 +283,79 @@ int main()
              },
              poker::HandCategory::full_house,
              "7-card evaluator should find the best full house") &&
+         ok;
+
+    poker::HeadsUpSimulationInput hero_wins_input{};
+    hero_wins_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::ace, poker::Suit::diamonds),
+    };
+    hero_wins_input.villain_hole = {
+        make_card(poker::Rank::king, poker::Suit::clubs),
+        make_card(poker::Rank::king, poker::Suit::diamonds),
+    };
+    hero_wins_input.board = {
+        make_card(poker::Rank::two, poker::Suit::spades),
+        make_card(poker::Rank::three, poker::Suit::hearts),
+        make_card(poker::Rank::four, poker::Suit::clubs),
+        make_card(poker::Rank::five, poker::Suit::diamonds),
+        make_card(poker::Rank::seven, poker::Suit::spades),
+    };
+    hero_wins_input.board_count = 5;
+    hero_wins_input.iterations = 10;
+    ok = expect_simulation_result(
+             hero_wins_input,
+             10,
+             0,
+             0,
+             "simulation should give hero all wins when board is complete and hero is ahead") &&
+         ok;
+
+    poker::HeadsUpSimulationInput tie_input{};
+    tie_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::clubs),
+        make_card(poker::Rank::king, poker::Suit::diamonds),
+    };
+    tie_input.villain_hole = {
+        make_card(poker::Rank::ace, poker::Suit::hearts),
+        make_card(poker::Rank::king, poker::Suit::spades),
+    };
+    tie_input.board = {
+        make_card(poker::Rank::queen, poker::Suit::clubs),
+        make_card(poker::Rank::jack, poker::Suit::diamonds),
+        make_card(poker::Rank::ten, poker::Suit::hearts),
+        make_card(poker::Rank::two, poker::Suit::clubs),
+        make_card(poker::Rank::three, poker::Suit::spades),
+    };
+    tie_input.board_count = 5;
+    tie_input.iterations = 10;
+    ok = expect_simulation_result(
+             tie_input,
+             0,
+             0,
+             10,
+             "simulation should count ties when both players share the same best hand") &&
+         ok;
+
+    const poker::MonteCarloSimulator simulator{};
+    poker::HeadsUpSimulationInput preflop_input{};
+    preflop_input.hero_hole = {
+        make_card(poker::Rank::ace, poker::Suit::spades),
+        make_card(poker::Rank::ace, poker::Suit::hearts),
+    };
+    preflop_input.villain_hole = {
+        make_card(poker::Rank::king, poker::Suit::spades),
+        make_card(poker::Rank::king, poker::Suit::hearts),
+    };
+    preflop_input.iterations = 50;
+    preflop_input.seed = 7;
+
+    const poker::HeadsUpSimulationResult preflop_result = simulator.simulate_heads_up(preflop_input);
+    ok = expect(
+             preflop_result.success &&
+                 preflop_result.hero_wins + preflop_result.villain_wins + preflop_result.ties ==
+                     preflop_result.iterations,
+             "simulation counts should sum to the total number of iterations") &&
          ok;
 
     return ok ? EXIT_SUCCESS : EXIT_FAILURE;

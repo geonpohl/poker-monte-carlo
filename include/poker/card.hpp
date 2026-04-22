@@ -34,6 +34,8 @@ enum class Rank {
 struct Card {
     Rank rank;
     Suit suit;
+
+    bool operator==(const Card&) const = default;
 };
 
 // These arrays give us one place that lists every possible suit and rank.
