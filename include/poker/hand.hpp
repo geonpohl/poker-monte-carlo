@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 namespace poker {
 
@@ -20,6 +21,8 @@ enum class HandCategory {
     four_of_a_kind,
     straight_flush,
 };
+
+using HandStrength = std::uint32_t;
 
 // This helper gives us readable text for printing and debugging.
 [[nodiscard]] const char* hand_category_name(HandCategory category) noexcept;
@@ -39,6 +42,11 @@ enum class HandCategory {
 // How many entries inside tie_break_ranks are meaningful for this hand.
 struct EvaluatedHand {
     HandCategory category{HandCategory::high_card};
+
+    // Packed score form of this hand.
+    // We keep it alongside the readable fields so the simulator can compare
+    // hands quickly without rebuilding tie-break logic on every iteration.
+    HandStrength strength{0};
 
     // A fixed-size array keeps the result simple and avoids dynamic allocation.
     // Five is enough because a 5-card hand can only contribute up to five ordered ranks.
@@ -97,8 +105,16 @@ struct StraightInfo {
 [[nodiscard]] EvaluatedHand evaluate_5_card_hand(
     const std::array<Card, five_card_hand_size>& cards) noexcept;
 
+// Fast packed score form used for hot-path comparisons.
+// Higher values always mean stronger hands.
+[[nodiscard]] HandStrength evaluate_5_card_strength(
+    const std::array<Card, five_card_hand_size>& cards) noexcept;
+
 // Evaluate 7 cards by choosing the best possible 5-card hand.
 [[nodiscard]] EvaluatedHand evaluate_7_card_hand(
+    const std::array<Card, seven_card_hand_size>& cards) noexcept;
+
+[[nodiscard]] HandStrength evaluate_7_card_strength(
     const std::array<Card, seven_card_hand_size>& cards) noexcept;
 
 // Compare two evaluated hands.

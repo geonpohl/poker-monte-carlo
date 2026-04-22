@@ -42,6 +42,82 @@ int category_value(HandCategory category) noexcept
     return static_cast<int>(category);
 }
 
+int rank_value_from_index(int index) noexcept
+{
+    return index + static_cast<int>(Rank::two);
+}
+
+std::size_t tie_break_count_for_category(HandCategory category) noexcept
+{
+    switch (category) {
+    case HandCategory::high_card:
+        return 5;
+    case HandCategory::pair:
+        return 4;
+    case HandCategory::two_pair:
+        return 3;
+    case HandCategory::three_of_a_kind:
+        return 3;
+    case HandCategory::straight:
+        return 1;
+    case HandCategory::flush:
+        return 5;
+    case HandCategory::full_house:
+        return 2;
+    case HandCategory::four_of_a_kind:
+        return 2;
+    case HandCategory::straight_flush:
+        return 1;
+    }
+
+    return 0;
+}
+
+HandStrength pack_strength(
+    HandCategory category,
+    int rank0 = 0,
+    int rank1 = 0,
+    int rank2 = 0,
+    int rank3 = 0,
+    int rank4 = 0) noexcept
+{
+    // Bit layout:
+    // [ category | rank0 | rank1 | rank2 | rank3 | rank4 ]
+    //
+    // Each field uses 4 bits. That is enough because:
+    // - categories fit in 0..8
+    // - ranks fit in 2..14
+    //
+    // Higher-strength information is placed in higher bits so plain integer
+    // comparison matches poker hand ordering.
+    HandStrength strength = static_cast<HandStrength>(category_value(category));
+    strength = (strength << 4) | static_cast<HandStrength>(rank0);
+    strength = (strength << 4) | static_cast<HandStrength>(rank1);
+    strength = (strength << 4) | static_cast<HandStrength>(rank2);
+    strength = (strength << 4) | static_cast<HandStrength>(rank3);
+    strength = (strength << 4) | static_cast<HandStrength>(rank4);
+    return strength;
+}
+
+EvaluatedHand decode_strength(HandStrength strength) noexcept
+{
+    EvaluatedHand hand{};
+    hand.strength = strength;
+
+    const HandCategory category =
+        static_cast<HandCategory>((strength >> 20U) & static_cast<HandStrength>(0xF));
+    hand.category = category;
+    hand.tie_break_count = tie_break_count_for_category(category);
+
+    for (std::size_t index = 0; index < hand.tie_break_count; ++index) {
+        const unsigned shift = static_cast<unsigned>(16U - (index * 4U));
+        const HandStrength rank_bits = (strength >> shift) & static_cast<HandStrength>(0xF);
+        hand.tie_break_ranks[index] = static_cast<Rank>(rank_bits);
+    }
+
+    return hand;
+}
+
 std::size_t rank_index(Rank rank) noexcept
 {
     // Rank::two has the numeric value 2, so subtracting Rank::two makes
@@ -69,14 +145,6 @@ bool is_flush(const HandCounts& counts) noexcept
     }
 
     return false;
-}
-
-void push_tie_break_rank(EvaluatedHand& hand, Rank rank) noexcept
-{
-    if (hand.tie_break_count < hand.tie_break_ranks.size()) {
-        hand.tie_break_ranks[hand.tie_break_count] = rank;
-        ++hand.tie_break_count;
-    }
 }
 
 }  // namespace
@@ -157,7 +225,7 @@ StraightInfo detect_straight(const HandCounts& counts) noexcept
     return StraightInfo{};
 }
 
-EvaluatedHand evaluate_5_card_hand(const std::array<Card, five_card_hand_size>& cards) noexcept
+HandStrength evaluate_5_card_strength(const std::array<Card, five_card_hand_size>& cards) noexcept
 {
     const HandCounts counts = count_ranks_and_suits(cards);
     const StraightInfo straight_info = detect_straight(counts);
@@ -199,82 +267,91 @@ EvaluatedHand evaluate_5_card_hand(const std::array<Card, five_card_hand_size>& 
         }
     }
 
-    EvaluatedHand hand{};
-
     if (straight_info.is_straight && flush) {
-        hand.category = HandCategory::straight_flush;
-        push_tie_break_rank(hand, straight_info.high_rank);
-        return hand;
+        return pack_strength(
+            HandCategory::straight_flush, rank_value(straight_info.high_rank), 0, 0, 0, 0);
     }
 
     if (four_of_a_kind_index != -1) {
-        hand.category = HandCategory::four_of_a_kind;
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(four_of_a_kind_index)));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[0])));
-        return hand;
+        return pack_strength(
+            HandCategory::four_of_a_kind,
+            rank_value_from_index(four_of_a_kind_index),
+            rank_value_from_index(single_indices[0]),
+            0,
+            0,
+            0);
     }
 
     if (three_of_a_kind_index != -1 && pair_count >= 1) {
-        hand.category = HandCategory::full_house;
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(three_of_a_kind_index)));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[0])));
-        return hand;
+        return pack_strength(
+            HandCategory::full_house,
+            rank_value_from_index(three_of_a_kind_index),
+            rank_value_from_index(pair_indices[0]),
+            0,
+            0,
+            0);
     }
 
     if (flush) {
-        hand.category = HandCategory::flush;
-        for (std::size_t index = 0; index < present_rank_count; ++index) {
-            push_tie_break_rank(
-                hand, rank_from_index(static_cast<std::size_t>(present_rank_indices[index])));
-        }
-        return hand;
+        return pack_strength(
+            HandCategory::flush,
+            rank_value_from_index(present_rank_indices[0]),
+            rank_value_from_index(present_rank_indices[1]),
+            rank_value_from_index(present_rank_indices[2]),
+            rank_value_from_index(present_rank_indices[3]),
+            rank_value_from_index(present_rank_indices[4]));
     }
 
     if (straight_info.is_straight) {
-        hand.category = HandCategory::straight;
-        push_tie_break_rank(hand, straight_info.high_rank);
-        return hand;
+        return pack_strength(
+            HandCategory::straight, rank_value(straight_info.high_rank), 0, 0, 0, 0);
     }
 
     if (three_of_a_kind_index != -1) {
-        hand.category = HandCategory::three_of_a_kind;
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(three_of_a_kind_index)));
-
-        for (std::size_t index = 0; index < single_count; ++index) {
-            push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[index])));
-        }
-
-        return hand;
+        return pack_strength(
+            HandCategory::three_of_a_kind,
+            rank_value_from_index(three_of_a_kind_index),
+            rank_value_from_index(single_indices[0]),
+            rank_value_from_index(single_indices[1]),
+            0,
+            0);
     }
 
     if (pair_count == 2) {
-        hand.category = HandCategory::two_pair;
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[0])));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[1])));
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[0])));
-        return hand;
+        return pack_strength(
+            HandCategory::two_pair,
+            rank_value_from_index(pair_indices[0]),
+            rank_value_from_index(pair_indices[1]),
+            rank_value_from_index(single_indices[0]),
+            0,
+            0);
     }
 
     if (pair_count == 1) {
-        hand.category = HandCategory::pair;
-        push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(pair_indices[0])));
-
-        for (std::size_t index = 0; index < single_count; ++index) {
-            push_tie_break_rank(hand, rank_from_index(static_cast<std::size_t>(single_indices[index])));
-        }
-
-        return hand;
+        return pack_strength(
+            HandCategory::pair,
+            rank_value_from_index(pair_indices[0]),
+            rank_value_from_index(single_indices[0]),
+            rank_value_from_index(single_indices[1]),
+            rank_value_from_index(single_indices[2]),
+            0);
     }
 
-    hand.category = HandCategory::high_card;
-    for (std::size_t index = 0; index < present_rank_count; ++index) {
-        push_tie_break_rank(
-            hand, rank_from_index(static_cast<std::size_t>(present_rank_indices[index])));
-    }
-    return hand;
+    return pack_strength(
+        HandCategory::high_card,
+        rank_value_from_index(present_rank_indices[0]),
+        rank_value_from_index(present_rank_indices[1]),
+        rank_value_from_index(present_rank_indices[2]),
+        rank_value_from_index(present_rank_indices[3]),
+        rank_value_from_index(present_rank_indices[4]));
 }
 
-EvaluatedHand evaluate_7_card_hand(const std::array<Card, seven_card_hand_size>& cards) noexcept
+EvaluatedHand evaluate_5_card_hand(const std::array<Card, five_card_hand_size>& cards) noexcept
+{
+    return decode_strength(evaluate_5_card_strength(cards));
+}
+
+HandStrength evaluate_7_card_strength(const std::array<Card, seven_card_hand_size>& cards) noexcept
 {
     std::array<Card, five_card_hand_size> candidate_cards{};
 
@@ -283,7 +360,7 @@ EvaluatedHand evaluate_7_card_hand(const std::array<Card, seven_card_hand_size>&
         candidate_cards[card_index] = cards[kSevenChooseFiveCombinations[0][card_index]];
     }
 
-    EvaluatedHand best_hand = evaluate_5_card_hand(candidate_cards);
+    HandStrength best_strength = evaluate_5_card_strength(candidate_cards);
 
     for (std::size_t combination_index = 1; combination_index < kSevenChooseFiveCombinations.size();
          ++combination_index) {
@@ -293,18 +370,36 @@ EvaluatedHand evaluate_7_card_hand(const std::array<Card, seven_card_hand_size>&
             candidate_cards[card_index] = cards[combination[card_index]];
         }
 
-        const EvaluatedHand candidate_hand = evaluate_5_card_hand(candidate_cards);
+        const HandStrength candidate_strength = evaluate_5_card_strength(candidate_cards);
 
-        if (compare_evaluated_hands(candidate_hand, best_hand) > 0) {
-            best_hand = candidate_hand;
+        if (candidate_strength > best_strength) {
+            best_strength = candidate_strength;
         }
     }
 
-    return best_hand;
+    return best_strength;
+}
+
+EvaluatedHand evaluate_7_card_hand(const std::array<Card, seven_card_hand_size>& cards) noexcept
+{
+    return decode_strength(evaluate_7_card_strength(cards));
 }
 
 int compare_evaluated_hands(const EvaluatedHand& left, const EvaluatedHand& right) noexcept
 {
+    // Fast path for hands that came from the evaluator.
+    if (left.strength != 0 || right.strength != 0) {
+        if (left.strength < right.strength) {
+            return -1;
+        }
+
+        if (left.strength > right.strength) {
+            return 1;
+        }
+
+        return 0;
+    }
+
     if (left.category != right.category) {
         return category_value(left.category) < category_value(right.category) ? -1 : 1;
     }

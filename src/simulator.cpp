@@ -200,13 +200,12 @@ HeadsUpSimulationResult MonteCarloSimulator::simulate_heads_up(
             std::swap(remaining_cards[random_index], remaining_cards[remaining_count]);
         }
 
-        const EvaluatedHand hero_hand = evaluate_7_card_hand(hero_cards);
-        const EvaluatedHand villain_hand = evaluate_7_card_hand(villain_cards);
-        const int comparison = compare_evaluated_hands(hero_hand, villain_hand);
+        const HandStrength hero_strength = evaluate_7_card_strength(hero_cards);
+        const HandStrength villain_strength = evaluate_7_card_strength(villain_cards);
 
-        if (comparison > 0) {
+        if (hero_strength > villain_strength) {
             ++result.hero_wins;
-        } else if (comparison < 0) {
+        } else if (hero_strength < villain_strength) {
             ++result.villain_wins;
         } else {
             ++result.ties;

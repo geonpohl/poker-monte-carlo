@@ -326,12 +326,19 @@ This step starts with measurement before optimization.
   Builds a release-mode benchmark binary and runs it with a chosen iteration count.
 - Baseline-first workflow
   We measure the current implementation before changing hot-path logic.
+- Packed hand strength
+  The evaluator now has a score-only fast path for simulator comparisons, while
+  the readable `EvaluatedHand` form is still available for CLI output and tests.
 
 This step is useful because it teaches:
 
 - benchmarking before optimizing
 - separating performance builds from normal debug-oriented builds
 - making each later optimization measurable
+
+On the current benchmark scenario (`As Ah` vs `Ks Kh` preflop, `200000` iterations),
+the kept optimizations moved the simulator from roughly `487k` iterations/sec to
+roughly `660k` iterations/sec on this machine.
 
 ## Next Steps
 

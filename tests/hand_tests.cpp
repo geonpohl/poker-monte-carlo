@@ -51,6 +51,25 @@ bool expect_comparison(
     return expect(comparison == expected_result, message);
 }
 
+bool expect_strength_comparison(
+    const std::array<poker::Card, poker::five_card_hand_size>& left_cards,
+    const std::array<poker::Card, poker::five_card_hand_size>& right_cards,
+    int expected_result,
+    const char* message)
+{
+    const poker::HandStrength left_strength = poker::evaluate_5_card_strength(left_cards);
+    const poker::HandStrength right_strength = poker::evaluate_5_card_strength(right_cards);
+
+    int comparison = 0;
+    if (left_strength < right_strength) {
+        comparison = -1;
+    } else if (left_strength > right_strength) {
+        comparison = 1;
+    }
+
+    return expect(comparison == expected_result, message);
+}
+
 bool expect_seven_card_category(
     const std::array<poker::Card, poker::seven_card_hand_size>& cards,
     poker::HandCategory expected_category,
@@ -275,6 +294,44 @@ int main()
              },
              1,
              "two pair should use kicker for comparison") &&
+         ok;
+
+    ok = expect_strength_comparison(
+             {
+                 make_card(poker::Rank::ace, poker::Suit::clubs),
+                 make_card(poker::Rank::ace, poker::Suit::diamonds),
+                 make_card(poker::Rank::queen, poker::Suit::hearts),
+                 make_card(poker::Rank::nine, poker::Suit::spades),
+                 make_card(poker::Rank::four, poker::Suit::clubs),
+             },
+             {
+                 make_card(poker::Rank::king, poker::Suit::clubs),
+                 make_card(poker::Rank::king, poker::Suit::diamonds),
+                 make_card(poker::Rank::jack, poker::Suit::hearts),
+                 make_card(poker::Rank::nine, poker::Suit::spades),
+                 make_card(poker::Rank::four, poker::Suit::clubs),
+             },
+             1,
+             "packed strength should rank pair of aces above pair of kings") &&
+         ok;
+
+    ok = expect_strength_comparison(
+             {
+                 make_card(poker::Rank::ten, poker::Suit::spades),
+                 make_card(poker::Rank::jack, poker::Suit::spades),
+                 make_card(poker::Rank::queen, poker::Suit::spades),
+                 make_card(poker::Rank::king, poker::Suit::spades),
+                 make_card(poker::Rank::ace, poker::Suit::spades),
+             },
+             {
+                 make_card(poker::Rank::ace, poker::Suit::hearts),
+                 make_card(poker::Rank::queen, poker::Suit::hearts),
+                 make_card(poker::Rank::nine, poker::Suit::hearts),
+                 make_card(poker::Rank::six, poker::Suit::hearts),
+                 make_card(poker::Rank::three, poker::Suit::hearts),
+             },
+             1,
+             "packed strength should rank straight flush above flush") &&
          ok;
 
     ok = expect_seven_card_category(
