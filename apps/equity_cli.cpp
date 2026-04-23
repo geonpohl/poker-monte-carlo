@@ -1,6 +1,7 @@
 #include "poker/card.hpp"
 #include "poker/deck.hpp"
 #include "poker/hand.hpp"
+#include "poker/range.hpp"
 #include "poker/simulator.hpp"
 
 #include <array>
@@ -17,15 +18,22 @@ void print_usage(const char* program_name)
     std::cout << "  " << program_name << " <card1> <card2> <card3> <card4> <card5>\n";
     std::cout << "  " << program_name
               << " <card1> <card2> <card3> <card4> <card5> <card6> <card7>\n";
+    std::cout << "  " << program_name << " range <token> [dead cards...]\n";
     std::cout << "  " << program_name << " simulate <hero1> <hero2> <villain1> <villain2>\n";
     std::cout << "  " << program_name
               << " simulate <hero1> <hero2> <villain1> <villain2> <iterations>\n";
+    std::cout << "  " << program_name << " simulate-range <hero-range> <villain1> <villain2>\n";
+    std::cout << "  " << program_name
+              << " simulate-range <hero-range> <villain1> <villain2> <iterations>\n";
     std::cout << "Examples:\n";
     std::cout << "  " << program_name << " As Kh\n";
     std::cout << "  " << program_name << " As Ks Qs Js Ts\n";
     std::cout << "  " << program_name << " As Ks Qs Js Ts 2d 3c\n";
+    std::cout << "  " << program_name << " range AKs Ac Qh\n";
     std::cout << "  " << program_name << " simulate As Ah Ks Kh 20000\n";
+    std::cout << "  " << program_name << " simulate-range AKs Ac Ad 20000\n";
     std::cout << "Cards use rank+suit, such as As, Td, 10h, or 2c.\n";
+    std::cout << "Range tokens currently support forms like QQ, AKs, and AQo.\n";
 }
 
 void print_card(const poker::Card& card)
@@ -37,6 +45,37 @@ void print_card(const poker::Card& card)
 bool cards_equal(const poker::Card& left, const poker::Card& right)
 {
     return left.rank == right.rank && left.suit == right.suit;
+}
+
+bool parse_dead_cards_from_arguments(
+    int argc,
+    char* argv[],
+    int first_argument_index,
+    std::array<poker::Card, poker::max_dead_cards_for_range_filter>& dead_cards,
+    std::size_t& dead_card_count)
+{
+    dead_card_count = 0;
+
+    for (int argument_index = first_argument_index; argument_index < argc; ++argument_index) {
+        if (dead_card_count >= dead_cards.size()) {
+            std::cerr << "Too many dead cards were provided.\n";
+            return false;
+        }
+
+        if (!poker::parse_card(argv[argument_index], dead_cards[dead_card_count])) {
+            std::cerr << "Could not parse dead card: " << argv[argument_index] << '\n';
+            return false;
+        }
+
+        ++dead_card_count;
+    }
+
+    return true;
+}
+
+void print_short_card(const poker::Card& card)
+{
+    std::cout << poker::rank_symbol(card.rank) << poker::suit_symbol(card.suit);
 }
 
 bool parse_iterations(const char* text, std::size_t& out_iterations)
@@ -85,6 +124,107 @@ void print_tie_break_ranks(const poker::EvaluatedHand& hand)
 
 int main(int argc, char* argv[])
 {
+    if (argc >= 3 && std::strcmp(argv[1], "range") == 0) {
+        poker::ExpandedRangeToken range{};
+
+        if (!poker::expand_range_token(argv[2], range)) {
+            std::cerr << "Could not parse range token: " << argv[2] << '\n';
+            print_usage(argv[0]);
+            return EXIT_FAILURE;
+        }
+
+        std::array<poker::Card, poker::max_dead_cards_for_range_filter> dead_cards{};
+        std::size_t dead_card_count = 0;
+
+        if (!parse_dead_cards_from_arguments(argc, argv, 3, dead_cards, dead_card_count)) {
+            return EXIT_FAILURE;
+        }
+
+        const poker::ExpandedRangeToken filtered_range =
+            poker::filter_range_token_dead_cards(range, dead_cards, dead_card_count);
+
+        std::cout << "poker-monte-carlo range expansion\n";
+        std::cout << "Token: " << argv[2] << '\n';
+        std::cout << "Combo count: " << filtered_range.combo_count << '\n';
+
+        if (dead_card_count > 0) {
+            std::cout << "Dead cards:";
+
+            for (std::size_t index = 0; index < dead_card_count; ++index) {
+                std::cout << ' ';
+                print_short_card(dead_cards[index]);
+            }
+
+            std::cout << '\n';
+        }
+
+        std::cout << "Combos:\n";
+
+        for (std::size_t index = 0; index < filtered_range.combo_count; ++index) {
+            std::cout << "  ";
+            print_short_card(filtered_range.combos[index].cards[0]);
+            std::cout << ' ';
+            print_short_card(filtered_range.combos[index].cards[1]);
+            std::cout << '\n';
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+    if (argc == 5 || argc == 6) {
+        if (std::strcmp(argv[1], "simulate-range") == 0) {
+            poker::HeadsUpRangeVsHandSimulationInput input{};
+
+            if (!poker::expand_range_token(argv[2], input.hero_range)) {
+                std::cerr << "Could not parse hero range: " << argv[2] << '\n';
+                print_usage(argv[0]);
+                return EXIT_FAILURE;
+            }
+
+            if (!poker::parse_card(argv[3], input.villain_hole[0])) {
+                std::cerr << "Could not parse villain card 1: " << argv[3] << '\n';
+                return EXIT_FAILURE;
+            }
+
+            if (!poker::parse_card(argv[4], input.villain_hole[1])) {
+                std::cerr << "Could not parse villain card 2: " << argv[4] << '\n';
+                return EXIT_FAILURE;
+            }
+
+            if (argc == 6 && !parse_iterations(argv[5], input.iterations)) {
+                std::cerr << "Could not parse iterations: " << argv[5] << '\n';
+                return EXIT_FAILURE;
+            }
+
+            const poker::MonteCarloSimulator simulator{};
+            const poker::HeadsUpSimulationResult result =
+                simulator.simulate_heads_up_range_vs_hand(input);
+
+            if (!result.success) {
+                std::cerr << "Simulation error: " << result.error_message << '\n';
+                return EXIT_FAILURE;
+            }
+
+            std::cout << "poker-monte-carlo heads-up range-vs-hand simulation\n";
+            std::cout << "Hero range: " << argv[2] << '\n';
+            std::cout << "Villain:\n";
+            std::cout << "  ";
+            print_card(input.villain_hole[0]);
+            std::cout << '\n';
+            std::cout << "  ";
+            print_card(input.villain_hole[1]);
+            std::cout << '\n';
+            std::cout << "Iterations: " << result.iterations << '\n';
+            std::cout << "Hero wins: " << result.hero_wins << '\n';
+            std::cout << "Villain wins: " << result.villain_wins << '\n';
+            std::cout << "Ties: " << result.ties << '\n';
+            std::cout << "Hero equity: " << result.hero_equity() << '\n';
+            std::cout << "Villain equity: " << result.villain_equity() << '\n';
+
+            return EXIT_SUCCESS;
+        }
+    }
+
     if (argc >= 2 && std::strcmp(argv[1], "simulate") == 0) {
         if (argc != 6 && argc != 7) {
             print_usage(argv[0]);

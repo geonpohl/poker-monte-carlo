@@ -18,6 +18,7 @@ add_library(
     src/card.cpp
     src/deck.cpp
     src/hand.cpp
+    src/range.cpp
     src/simulator.cpp
 )
 
@@ -34,6 +35,9 @@ target_link_libraries(poker_perf PRIVATE poker_core)
 
 if(BUILD_TESTING)
     add_executable(poker_hand_tests tests/hand_tests.cpp)
+    add_executable(poker_range_tests tests/range_tests.cpp)
     target_link_libraries(poker_hand_tests PRIVATE poker_core)
+    target_link_libraries(poker_range_tests PRIVATE poker_core)
     add_test(NAME poker_hand_tests COMMAND poker_hand_tests)
+    add_test(NAME poker_range_tests COMMAND poker_range_tests)
 endif()

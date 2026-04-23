@@ -23,6 +23,8 @@ ctest --test-dir build --output-on-failure
 ./build/poker_cli As Kh
 ./build/poker_cli As Ks Qs Js Ts
 ./build/poker_cli As Ks Qs Js Ts 2d 3c
+./build/poker_cli range AKs Ac
+./build/poker_cli simulate-range AKs Ac Ad 20000
 ./build/poker_cli simulate As Ah Ks Kh 20000
 ```
 
@@ -33,6 +35,8 @@ make test
 make run ARGS="As Kh"
 make run ARGS="As Ks Qs Js Ts"
 make run ARGS="As Ks Qs Js Ts 2d 3c"
+make run ARGS="range AKs Ac"
+make run ARGS="simulate-range AKs Ac Ad 20000"
 make run ARGS="simulate As Ah Ks Kh 20000"
 make perf PERF_ARGS=200000
 ```
@@ -54,6 +58,7 @@ make perf PERF_ARGS=200000
 - A focused test suite for hand-ranking confidence checks
 - A first heads-up Monte Carlo simulation loop
 - Expanded simulator correctness and edge-case checks
+- A first range layer for `QQ`, `AKs`, and `AQo` style tokens
 - One tiny simulator class with a placeholder method
 - A dedicated optimization history in [OPTIMIZATIONS.md](/Users/geonpohl/Projects/poker-monte-carlo/OPTIMIZATIONS.md)
 
@@ -328,6 +333,25 @@ That file contains:
 - why we made each change
 - what improvements we measured
 - what we reverted and why
+
+## Milestone 9: Range Support
+
+The first few range-support steps are now in place.
+
+- `StartingHandPattern`
+  Parses one starting-hand token such as `QQ`, `AKs`, or `AQo`.
+- `ExpandedRangeToken`
+  Stores the concrete two-card combos that token represents.
+- `poker_cli range <token> [dead cards...]`
+  Expands a token and filters out blocked combos.
+- `poker_cli simulate-range <hero-range> <villain1> <villain2> [iterations]`
+  Runs the first range-vs-hand Monte Carlo simulation mode.
+
+This step is useful because it teaches:
+
+- separating abstract hand classes from concrete card combos
+- representing small fixed-size results without dynamic allocation
+- building range support in layers before full range-vs-range simulation
 
 ## Next Steps
 

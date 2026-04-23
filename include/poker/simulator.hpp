@@ -1,6 +1,7 @@
 #pragma once
 
 #include "poker/card.hpp"
+#include "poker/range.hpp"
 
 #include <array>
 #include <cstddef>
@@ -46,6 +47,27 @@ struct HeadsUpSimulationResult {
     [[nodiscard]] double villain_equity() const noexcept;
 };
 
+struct HeadsUpRangeVsHandSimulationInput {
+    ExpandedRangeToken hero_range{};
+
+    std::array<Card, hole_card_count> villain_hole{
+        Card{Rank::four, Suit::clubs},
+        Card{Rank::five, Suit::clubs},
+    };
+
+    std::array<Card, 5> board{
+        Card{Rank::two, Suit::diamonds},
+        Card{Rank::three, Suit::diamonds},
+        Card{Rank::four, Suit::diamonds},
+        Card{Rank::five, Suit::diamonds},
+        Card{Rank::six, Suit::diamonds},
+    };
+
+    std::size_t board_count{0};
+    std::size_t iterations{10'000};
+    std::uint32_t seed{1337};
+};
+
 class MonteCarloSimulator final {
   public:
     // Returns a short message describing the current simulator state.
@@ -59,6 +81,9 @@ class MonteCarloSimulator final {
 
     [[nodiscard]] HeadsUpSimulationResult simulate_heads_up(
         const HeadsUpSimulationInput& input) const noexcept;
+
+    [[nodiscard]] HeadsUpSimulationResult simulate_heads_up_range_vs_hand(
+        const HeadsUpRangeVsHandSimulationInput& input) const noexcept;
 };
 
 }  // namespace poker

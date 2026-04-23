@@ -94,3 +94,26 @@ Only after measuring, consider deeper evaluator or data-layout changes if they c
 
 Milestone 8 implementation details and results now live in
 [OPTIMIZATIONS.md](/Users/geonpohl/Projects/poker-monte-carlo/OPTIMIZATIONS.md).
+
+## Milestone 9 Breakdown
+
+1. Range model
+Add a small type for two-card combos and a fixed-size way to store the combos that belong to one range token.
+
+2. Single-token parsing
+Parse basic starting-hand notation such as `QQ`, `AKs`, and `AQo`.
+
+3. Range expansion
+Expand one parsed token into all concrete two-card combos it represents.
+
+4. CLI inspection
+Add a small CLI mode so we can inspect and verify range expansion before using it in simulation.
+
+5. Dead-card filtering
+Teach range expansion to remove combos blocked by known hole cards or board cards.
+
+6. Range-vs-hand simulation
+Allow one player to use a range while the other still uses exact cards.
+
+7. Range-vs-range simulation
+Support both players using ranges and combine combo sampling with board sampling.
